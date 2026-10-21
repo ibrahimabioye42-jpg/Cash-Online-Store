@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seller Dashboard | Cash Online Store</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="navbar">
+    <a class="logo" href="{{ url_for('home') }}">
+        <span class="logo-icon">C</span>
+        Cash Online Store
+    </a>
+</header>
+<main class="section">
+    <div class="account-note">
+        <h2>Seller Dashboard</h2>
+        <p>Welcome, {{ session.get('user_name') }}!</p>
+        <p>Manage your products and grow your online business.</p>
+        <p><strong>Free listing allowance:</strong> 5 products</p>
+        <button class="primary-button" type="button"
+                onclick="alert('Product listing will be added in the next step.')">
+            Add Product
+        </button>
+        <p>
+            <a href="{{ url_for('home') }}">Return to Store</a>
+        </p>
+        <form method="POST" action="{{ url_for('logout') }}">
+            <button type="submit">Logout</button>
+        </form>
+    </div>
+</main>
+</body>
+</html>

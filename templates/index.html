@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Cash Online Store | Buy. Sell. Grow.</title>
+
+    <meta name="description"
+          content="Shop products from sellers on Cash Online Store, your online marketplace in Ghana.">
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<header class="navbar">
+    <a class="logo" href="{{ url_for('home') }}">
+        <span class="logo-icon">N</span>
+        Cash Online Store
+    </a>
+
+    <form class="search-form" action="{{ url_for('home') }}" method="GET">
+        <input
+            type="search"
+            name="q"
+            placeholder="Search products..."
+            value="{{ search }}"
+            aria-label="Search products"
+        >
+        <button type="submit">Search</button>
+    </form>
+
+    <nav class="nav-links">
+        <a href="#products">Shop</a>
+        <a href="#categories">Categories</a>
+        <a href="#sell">Sell</a>
+       {% if session.get('user_id') %}
+    <span>Welcome, {{ session.get('user_name') }}!</span>
+
+    {% if session.get('user_role') == 'seller' %}
+        <a href="{{ url_for('seller_dashboard') }}">
+            Seller Dashboard
+        </a>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('logout') }}">
+        <button type="submit">Logout</button>
+    </form>
+{% else %}
+    <a href="{{ url_for('login') }}">Login</a>
+    <a href="{{ url_for('register') }}">Sign Up</a>
+{% endif %}
+    </nav>
+</header>
+
+<main>
+
+    <section class="hero">
+        <div class="hero-content">
+            <span class="eyebrow">YOUR MARKETPLACE IN GHANA</span>
+
+            <h1>Buy. Sell.<br><span>Grow.</span></h1>
+
+            <p>
+                Discover great products, connect with sellers,
+                and grow your business with Cash Online Store.
+            </p>
+
+            <div class="hero-actions">
+                <a class="primary-button" href="#products">
+                    Start Shopping
+                </a>
+
+                <a class="secondary-button" href="#sell">
+                    Start Selling
+                </a>
+            </div>
+
+            <p class="hero-note">
+                Shop confidently. Pay securely through Paystack
+                when checkout is enabled.
+            </p>
+        </div>
+
+        <div class="hero-art" aria-hidden="true">
+            <div class="art-circle"></div>
+            <div class="art-card">
+                <span>CASH ONLINE STORE</span>
+                <div class="art-bag">🛍️</div>
+                <h3>Discover More.</h3>
+                <p>Your next great find is here.</p>
+            </div>
+            <div class="floating-tag">Made for shoppers</div>
+        </div>
+    </section>
+
+    <section class="benefits">
+        <div class="benefit">
+            <span class="benefit-icon">🛒</span>
+            <div>
+                <strong>Easy Shopping</strong>
+                <p>Find products in one place.</p>
+            </div>
+        </div>
+
+        <div class="benefit">
+            <span class="benefit-icon">🔒</span>
+            <div>
+                <strong>Secure Payments</strong>
+                <p>Paystack integration coming next.</p>
+            </div>
+        </div>
+
+        <div class="benefit">
+            <span class="benefit-icon">🚀</span>
+            <div>
+                <strong>Sell and Grow</strong>
+                <p>Build your online business.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="categories" class="section">
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">EXPLORE</span>
+                <h2>Shop by category</h2>
+            </div>
+            <a href="#products" class="text-link">View products →</a>
+        </div>
+
+       <div class="category-list">
+    {% for category in categories %}
+    <a
+        class="category-chip
+        {% if selected_category|lower == category|lower %}active{% endif %}"
+        href="{{ url_for('home', q=search, category=category) }}"
+    >
+        {{ category }}
+    </a>
+    {% endfor %}
+
+    <a
+        class="category-chip"
+        href="{{ url_for('home', q=search) }}"
+    >
+        All Categories
+    </a>
+</div>
+    </section>
+
+    <section id="products" class="section">
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">OUR MARKETPLACE</span>
+                <h2>
+                    {% if search %}
+                        Search results
+                    {% elif selected_category %}
+                        {{ selected_category }}
+                    {% else %}
+                        Featured products
+                    {% endif %}
+                </h2>
+                <p class="muted">
+                    {{ products|length }} product(s) found
+                </p>
+            </div>
+        </div>
+
+        {% if products %}
+        <div class="product-grid">
+            {% for product in products %}
+            <article class="product-card">
+                <a
+                    class="product-image"
+                    href="#product-{{ product.id }}"
+                    aria-label="View {{ product.name }}"
+                >
+                    <img
+                        src="{{ product.image }}"
+                        alt="{{ product.name }}"
+                        loading="lazy"
+                    >
+                    <span class="product-label">Name Heap</span>
+                </a>
+
+                <div class="product-info">
+                    <span class="product-category">
+                        {{ product.category }}
+                    </span>
+
+                    <h3>{{ product.name }}</h3>
+                    <p class="product-description">
+                        {{ product.description }}
+                    </p>
+
+                    <div class="product-bottom">
+                        <strong class="price">
+                            GH₵ {{ "{:,.2f}".format(product.price) }}
+                        </strong>
+
+                        <button
+                            class="add-button"
+                            type="button"
+                            onclick="addToCart({{ product.id }}, '{{ product.name }}')"
+                        >
+                            + Add
+                        </button>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <h3>No products found</h3>
+            <p>Try another search or browse all products.</p>
+            <a class="primary-button" href="{{ url_for('home') }}">
+                Show all products
+            </a>
+        </div>
+        {% endif %}
+    </section>
+
+    <section id="sell" class="seller-banner">
+        <div>
+            <span class="eyebrow">FOR BUSINESS OWNERS</span>
+            <h2>Have something to sell?</h2>
+            <p>
+                Join Cash Online Store. Publish your first five products
+                for free before choosing a monthly seller plan.
+            </p>
+        </div>
+
+        <a class="primary-button"
+   href="{{ url_for('register') }}">
+    Become a Seller
+</a>
+    </section>
+
+    <section id="account" class="account-note">
+        <h2>Your Cash Online Store journey starts here.</h2>
+        <p>
+            Buyer and seller registration will be added in the next
+            development stage.
+        </p>
+    </section>
+
+</main>
+
+<footer class="footer">
+    <a class="logo footer-logo" href="{{ url_for('home') }}">
+        <span class="logo-icon">N</span>
+        Cash Online Store
+    </a>
+
+    <p>Buy. Sell. Grow.</p>
+    <p>&copy; 2026 Cash Online Store. All rights reserved.</p>
+</footer>
+
+<div id="cart-notice" class="cart-notice" role="status"
+     aria-live="polite"></div>
+
+<script>
+    let cartCount = 0;
+
+    function addToCart(productId, productName) {
+        cartCount++;
+
+        const notice = document.getElementById("cart-notice");
+        notice.textContent =
+            productName + " selected. Items selected: " + cartCount;
+
+        notice.classList.add("visible");
+    }
+</script>
+
+</body>
+</html>

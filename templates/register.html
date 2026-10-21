@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register | Cash Online Store</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="navbar">
+    <a class="logo" href="{{ url_for('home') }}">
+        <span class="logo-icon">C</span>
+        Cash Online Store
+    </a>
+</header>
+
+<main class="section">
+    <div class="account-note">
+        <h2>Create your account</h2>
+        <p>Join Cash Online Store to shop or sell products.</p>
+
+        {% if error %}
+    <p role="alert" style="color: #c62828;">
+        {{ error }}
+    </p>
+{% endif %}
+
+{% if success %}
+    <p role="status" style="color: #16663c;">
+        {{ success }}
+    </p>
+{% endif %}
+
+        <form action="{{ url_for('register') }}" method="POST">
+            <div style="margin-bottom: 16px;">
+                <label for="name">Full name</label>
+                <input id="name" name="name" type="text"
+                       autocomplete="name" required
+                       style="display:block;width:100%;padding:12px;
+                       margin-top:6px;border:1px solid #e4eaf2;
+                       border-radius:8px;">
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label for="email">Email address</label>
+                <input id="email" name="email" type="email"
+                       autocomplete="email" required
+                       style="display:block;width:100%;padding:12px;
+                       margin-top:6px;border:1px solid #e4eaf2;
+                       border-radius:8px;">
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password"
+                       autocomplete="new-password"
+                       minlength="8" required
+                       style="display:block;width:100%;padding:12px;
+                       margin-top:6px;border:1px solid #e4eaf2;
+                       border-radius:8px;">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="role">Account type</label>
+                <select id="role" name="role" required
+                        style="display:block;width:100%;padding:12px;
+                        margin-top:6px;border:1px solid #e4eaf2;
+                        border-radius:8px;">
+                    <option value="buyer">Buyer</option>
+                    <option value="seller">Seller</option>
+                </select>
+            </div>
+
+            <button class="primary-button" type="submit">
+                Create Account
+            </button>
+        </form>
+
+        <p>
+    Already registered?
+    <a href="{{ url_for('login') }}">Login here</a>.
+</p>
+    </div>
+</main>
+
+</body>
+</html>
