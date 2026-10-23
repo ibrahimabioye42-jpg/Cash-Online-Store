@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications - Cash Online Store</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <main class="notifications-container">
+        <h1>My Notifications</h1>
+        <a href="{{ url_for('home') }}">Back to Store</a>
+        {% if notifications %}
+            {% for item in notifications %}
+                <article class="notification-card">
+                    <p>{{ item['message'] }}</p>
+                    {% if item['order_id'] %}
+                        <p>
+                            Order number: #{{ item['order_id'] }}
+                        </p>
+                    {% endif %}
+                    <small>{{ item['created_at'] }}</small>
+                </article>
+            {% endfor %}
+        {% else %}
+            <p>You have no notifications yet.</p>
+        {% endif %}
+    </main>
+</body>
+</html>

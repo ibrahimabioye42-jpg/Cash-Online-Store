@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seller Orders - Cash Online Store</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <main class="seller-orders-container">
+        <h1>My Product Orders</h1>
+        <p>Manage orders placed for your products.</p>
+        <a href="{{ url_for('home') }}">Back to Store</a>
+        {% if orders %}
+            <div class="seller-orders-list">
+                {% for order in orders %}
+                    <section class="seller-order-card">
+                        {% if order['product_image'] %}
+                            <img
+                                src="{{ order['product_image'] }}"
+                                alt="{{ order['product_name'] }}"
+                                class="seller-order-image">
+                        {% else %}
+                            <div class="seller-order-no-image">
+                                No image
+                            </div>
+                        {% endif %}
+                        <div class="seller-order-details">
+                            <h2>{{ order['product_name'] }}</h2>
+                            <p>
+                                <strong>Order number:</strong>
+                                #{{ order['order_id'] }}
+                            </p>
+                            <p>
+                                <strong>Buyer:</strong>
+                                {{ order['buyer_name'] }}
+                            </p>
+                            <p>
+                                <strong>Buyer email:</strong>
+                                {{ order['buyer_email'] }}
+                            </p>
+                            <p>
+                                <strong>Quantity:</strong>
+                                {{ order['quantity'] }}
+                            </p>
+                            <p>
+                                <strong>Total:</strong>
+                                GH₵ {{ "%.2f"|format(order['total_price']) }}
+                            </p>
+                            <p>
+                                <strong>Date:</strong>
+                                {{ order['created_at'] }}
+                            </p>
+                            <p>
+                                <strong>Current status:</strong>
+                                {{ order['status'] }}
+                            </p>
+                            <form
+                                method="POST"
+                                action="{{ url_for(
+                                    'update_order_status',
+                                    order_id=order['order_id']
+                                ) }}">
+                                <label for="status-{{ order['order_id'] }}">
+                                    Update order status
+                                </label>
+                                <select
+                                    id="status-{{ order['order_id'] }}"
+                                    name="status"
+                                    required>
+                                    {% for status in [
+                                        'Pending',
+                                        'Confirmed',
+                                        'Shipped',
+                                        'Completed',
+                                        'Cancelled'
+                                    ] %}
+                                        <option
+                                            value="{{ status }}"
+                                            {% if order['status'] == status %}
+                                                selected
+                                            {% endif %}>
+                                            {{ status }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit">
+                                    Update Status
+                                </button>
+                            </form>
+                        </div>
+                    </section>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>You have no orders yet.</p>
+        {% endif %}
+    </main>
+</body>
+</html>

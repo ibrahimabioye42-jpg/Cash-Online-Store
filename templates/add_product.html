@@ -24,7 +24,19 @@
         <p role="alert" style="color:#c62828;">{{ error }}</p>
         {% endif %}
 
-        <form method="POST" action="{{ url_for('add_product') }}">
+        <form method="POST" action="{{ url_for('add_product') }}"
+        enctype="multipart/form-data">
+        <p>
+            <label for="image">Product Image</label>
+
+<input
+    type="file"
+    id="image"
+    name="image"
+    accept=".jpg,.jpeg,.png,.webp,.gif,image/*">
+
+<small>Accepted formats: JPG, PNG, WEBP or GIF. Maximum 5 MB.</small>
+        </p>
             <p>
                 <label for="name">Product name</label>
                 <input id="name" name="name" required maxlength="150"

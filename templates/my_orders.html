@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Orders | Cash Online Store</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="navbar">
+    <a class="logo" href="{{ url_for('home') }}">
+        <span class="logo-icon">N</span>
+        Cash Online Store
+    </a>
+
+    <nav class="nav-links">
+        <a href="{{ url_for('home') }}">Home</a>
+        <a href="{{ url_for('home') }}#products">Shop</a>
+        <a href="{{ url_for('my_orders') }}">My Orders</a>
+    </nav>
+</header>
+
+<main class="orders-container">
+    <div class="orders-heading">
+        <span class="eyebrow">YOUR ACCOUNT</span>
+        <h1>My Orders</h1>
+        <p>View the products you have ordered.</p>
+    </div>
+
+    {% if orders %}
+        <div class="orders-list">
+            {% for order in orders %}
+                <article class="order-card">
+
+                    {% if order['product_image'] %}
+                        <img
+                            class="order-image"
+                            src="{{ order['product_image'] }}"
+                            alt="{{ order['product_name'] }}">
+                    {% else %}
+                        <div class="order-image-placeholder">
+                            No image
+                        </div>
+                    {% endif %}
+
+                    <div class="order-details">
+                        <h2>{{ order['product_name'] }}</h2>
+
+                        <p>
+                            Order number: #{{ order['order_id'] }}
+                        </p>
+
+                        <p>
+                            Seller: {{ order['seller_name'] }}
+                        </p>
+
+                        <p>
+                            Quantity: {{ order['quantity'] }}
+                        </p>
+
+                        <p>
+                            Total:
+                            <strong>
+                                GH₵ {{ "%.2f"|format(order['total_price']) }}
+                            </strong>
+                        </p>
+
+                        <p>
+                            Date: {{ order['created_at'] }}
+                        </p>
+
+                        <span class="order-status">
+                            {{ order['status'] }}
+                        </span>
+                    </div>
+
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h2>You haven't placed any orders yet.</h2>
+            <p>Explore the marketplace to find something you like.</p>
+
+            <a class="primary-button" href="{{ url_for('home') }}">
+                Start Shopping
+            </a>
+        </div>
+    {% endif %}
+</main>
+
+<footer class="footer">
+    <a class="logo footer-logo" href="{{ url_for('home') }}">
+        <span class="logo-icon">N</span>
+        Cash Online Store
+    </a>
+    <p>Buy. Sell. Grow.</p>
+</footer>
+
+</body>
+</html>

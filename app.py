@@ -1,3 +1,6 @@
+from itertools import product
+from multiprocessing import connection
+
 from flask import (
     Flask, render_template, request,
     redirect, url_for, session, abort
@@ -7,8 +10,10 @@ import os
 from urllib.parse import urlparse
 from werkzeug.security import (
     generate_password_hash,
-    check_password_hash
+    check_password_hash,
 )
+import uuid
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = os.environ.get(
@@ -20,6 +25,19 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE = os.path.join(BASE_DIR, "cash_store.db")
 FREE_PRODUCT_LIMIT = 5
 
+UPLOAD_FOLDER = os.path.join(
+    BASE_DIR, "static", "uploads"
+)
+
+ALLOWED_EXTENSIONS = {
+    "jpg", "jpeg", "png", "webp", "gif"
+}
+
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+app.config["MAX_CONTENT_LENGTH"] = MAX_IMAGE_SIZE
 
 def get_db_connection():
     connection = sqlite3.connect(DATABASE)
@@ -78,6 +96,18 @@ def init_db():
             FOREIGN KEY (product_id) REFERENCES products(id)
         )
     """)
+    connection.execute("""
+    CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        order_id INTEGER,
+        message TEXT NOT NULL,
+        is_read INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (order_id) REFERENCES orders(id)
+    )
+""")
 
     connection.commit()
     connection.close()
@@ -289,6 +319,84 @@ def seller_dashboard():
         product_limit=FREE_PRODUCT_LIMIT
     )
 
+@app.route("/seller/orders")
+def seller_orders():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user_role") != "seller":
+        return redirect(url_for("home"))
+
+    connection = get_db_connection()
+
+    try:
+        orders = connection.execute("""
+            SELECT
+                o.id AS order_id,
+                o.quantity,
+                o.total_price,
+                o.status,
+                o.created_at,
+                p.name AS product_name,
+                p.image AS product_image,
+                u.name AS buyer_name,
+                u.email AS buyer_email
+            FROM orders o
+            JOIN products p ON p.id = o.product_id
+            JOIN users u ON u.id = o.buyer_id
+            WHERE p.seller_id = ?
+            ORDER BY o.created_at DESC, o.id DESC
+        """, (session["user_id"],)).fetchall()
+    finally:
+        connection.close()
+
+    return render_template("seller_orders.html", orders=orders)
+
+@app.route("/seller/orders/<int:order_id>/status", methods=["POST"])
+def update_order_status(order_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user_role") != "seller":
+        return redirect(url_for("home"))
+
+    new_status = request.form.get("status", "").strip()
+
+    allowed_statuses = {
+        "Pending",
+        "Confirmed",
+        "Shipped",
+        "Completed",
+        "Cancelled"
+    }
+
+    if new_status not in allowed_statuses:
+        return "Invalid order status.", 400
+
+    connection = get_db_connection()
+
+    try:
+        result = connection.execute("""
+            UPDATE orders
+            SET status = ?
+            WHERE id = ?
+              AND product_id IN (
+                  SELECT id
+                  FROM products
+                  WHERE seller_id = ?
+              )
+        """, (new_status, order_id, session["user_id"]))
+
+        connection.commit()
+
+        if result.rowcount == 0:
+            abort(404)
+
+    finally:
+        connection.close()
+
+    return redirect(url_for("seller_orders"))
+
 
 @app.route("/seller/product/add", methods=["GET", "POST"])
 def add_product():
@@ -320,23 +428,55 @@ def add_product():
         name = request.form.get("name", "").strip()
         category = request.form.get("category", "").strip()
         description = request.form.get("description", "").strip()
-        image = request.form.get("image", "").strip()
         price_text = request.form.get("price", "").strip()
         quantity_text = request.form.get("quantity", "1").strip()
+
+        image_file = request.files.get("image")
+        image_path = ""
 
         try:
             price = float(price_text)
             quantity = int(quantity_text)
 
             if not name or not category:
-                raise ValueError("Enter a product name and category.")
+                raise ValueError(
+                    "Enter a product name and category."
+                )
 
             if price < 0 or quantity < 0:
-                raise ValueError("Price and quantity cannot be negative.")
+                raise ValueError(
+                    "Price and quantity cannot be negative."
+                )
+
+            if not price_text or not quantity_text:
+                raise ValueError(
+                    "Enter a price and quantity."
+                )
 
         except ValueError as exc:
             error = str(exc) or "Enter a valid price and quantity."
-        else:
+
+        # Validate the image if the seller selected one.
+        if not error and image_file and image_file.filename:
+            original_name = secure_filename(image_file.filename)
+
+            if not original_name or "." not in original_name:
+                error = "Please choose a valid image file."
+            else:
+                extension = original_name.rsplit(".", 1)[1].lower()
+
+                if extension not in ALLOWED_EXTENSIONS:
+                    error = (
+                        "Image must be JPG, JPEG, PNG, WEBP or GIF."
+                    )
+                else:
+                    unique_name = (
+                        uuid.uuid4().hex + "." + extension
+                    )
+
+                    image_path = "/static/uploads/" + unique_name
+
+        if not error:
             connection = get_db_connection()
             try:
                 # Recheck the limit before inserting.
@@ -347,26 +487,49 @@ def add_product():
                 """, (session["user_id"],)).fetchone()["total"]
 
                 if current_count >= FREE_PRODUCT_LIMIT:
-                    error = "You have reached your free limit of 5 products."
+                    error = (
+                        "You have reached your free limit of 5 products."
+                    )
                 else:
+                    # Save the image only after validation.
+                    if image_file and image_file.filename:
+                        image_file.seek(0)
+                        image_file.save(
+                            os.path.join(
+                                UPLOAD_FOLDER, unique_name
+                            )
+                        )
+
                     connection.execute("""
                         INSERT INTO products
                         (seller_id, name, category, price,
                          quantity, image, description)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                     """, (
-                        session["user_id"], name, category,
-                        price, quantity, image, description
+                        session["user_id"],
+                        name,
+                        category,
+                        price,
+                        quantity,
+                        image_path,
+                        description
                     ))
+
                     connection.commit()
+
+            except Exception:
+                connection.rollback()
+                raise
             finally:
                 connection.close()
 
             if not error:
                 return redirect(url_for("seller_dashboard"))
 
-    return render_template("add_product.html", error=error)
-
+    return render_template(
+        "add_product.html",
+        error=error
+    )
 
 @app.route("/product/<int:product_id>")
 def product_detail(product_id):
@@ -453,18 +616,20 @@ def checkout(product_id):
     if session.get("user_role") != "buyer":
         return "Only buyer accounts can place orders.", 403
 
+    # Get and validate quantity
     try:
         quantity = int(request.form.get("quantity", "1"))
         if quantity < 1:
             raise ValueError
-    except ValueError:
+    except (ValueError, TypeError):
         return "Please enter a valid quantity.", 400
 
     connection = get_db_connection()
+
     try:
-        # Recheck stock immediately before creating the order.
+        # Retrieve the product and seller
         product = connection.execute("""
-            SELECT p.id, p.price, p.quantity
+            SELECT p.id, p.name, p.price, p.quantity, p.seller_id
             FROM products p
             JOIN users u ON u.id = p.seller_id
             WHERE p.id = ? AND u.role = 'seller'
@@ -476,9 +641,11 @@ def checkout(product_id):
         if quantity > product["quantity"]:
             return "Sorry, there is not enough stock available.", 400
 
+        # Calculate total price
         total_price = product["price"] * quantity
 
-        connection.execute("""
+        # Insert the order
+        cursor = connection.execute("""
             INSERT INTO orders
                 (buyer_id, product_id, quantity, total_price)
             VALUES (?, ?, ?, ?)
@@ -489,23 +656,38 @@ def checkout(product_id):
             total_price
         ))
 
-        # Reduce available stock.
+        order_id = cursor.lastrowid
+
+        # Notify the seller
         connection.execute("""
+            INSERT INTO notifications (user_id, order_id, message)
+            VALUES (?, ?, ?)
+        """, (
+            product["seller_id"],
+            order_id,
+            f"New order received for {product['name']}."
+        ))
+
+        # Reduce available stock
+        stock_update = connection.execute("""
             UPDATE products
             SET quantity = quantity - ?
             WHERE id = ? AND quantity >= ?
         """, (quantity, product_id, quantity))
+
+        if stock_update.rowcount != 1:
+            raise ValueError("Stock changed. Please try again.")
 
         connection.commit()
 
     except Exception:
         connection.rollback()
         raise
+
     finally:
         connection.close()
 
     return redirect(url_for("order_success"))
-
 @app.route("/order-success")
 def order_success():
     if "user_id" not in session:
@@ -515,6 +697,66 @@ def order_success():
         return redirect(url_for("home"))
 
     return render_template("order_success.html")
+
+@app.route("/my-orders")
+def my_orders():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user_role") != "buyer":
+        return redirect(url_for("home"))
+
+    connection = get_db_connection()
+    try:
+        orders = connection.execute("""
+            SELECT
+                o.id AS order_id,
+                o.quantity,
+                o.total_price,
+                o.status,
+                o.created_at,
+                p.name AS product_name,
+                p.image AS product_image,
+                p.category AS product_category,
+                u.name AS seller_name
+            FROM orders o
+            JOIN products p ON p.id = o.product_id
+            JOIN users u ON u.id = p.seller_id
+            WHERE o.buyer_id = ?
+            ORDER BY o.created_at DESC, o.id DESC
+        """, (session["user_id"],)).fetchall()
+    finally:
+        connection.close()
+
+    return render_template("my_orders.html", orders=orders)
+
+@app.route("/notifications")
+def notifications():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    connection = get_db_connection()
+
+    try:
+        items = connection.execute("""
+            SELECT id, order_id, message, is_read, created_at
+            FROM notifications
+            WHERE user_id = ?
+            ORDER BY created_at DESC, id DESC
+        """, (session["user_id"],)).fetchall()
+
+        connection.execute("""
+            UPDATE notifications
+            SET is_read = 1
+            WHERE user_id = ?
+        """, (session["user_id"],))
+
+        connection.commit()
+    finally:
+        connection.close()
+
+    return render_template("notifications.html", notifications=items)
+
 
 
 # Create missing tables without deleting existing records.
