@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation | Cash Online Store</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <main class="container">
+        <h1>Order Placed Successfully!</h1>
+        <p>Your order has been saved. Its current status is Pending.</p>
+        <p>No payment has been processed by this demo.</p>
+        <a href="{{ url_for('home') }}">Return to Homepage</a>
+    </main>
+</body>
+</html>

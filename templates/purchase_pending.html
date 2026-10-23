@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout | Cash Online Store</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <header>
+        <h1>Cash Online Store</h1>
+        <a href="{{ url_for('home') }}">Back to Homepage</a>
+    </header>
+
+    <main class="container">
+        <h2>Thank you for choosing Cash Online Store!</h2>
+
+        <p>
+            You are signed in as a buyer and ready to continue.
+        </p>
+
+        <p>
+            Product ID: {{ product_id }}
+        </p>
+
+        <p>
+            The checkout and payment system is not yet available.
+            Your order has not been placed and no payment has been made.
+        </p>
+
+        <a href="{{ url_for('product_detail',
+                            product_id=product_id) }}">
+            Back to Product Details
+        </a>
+
+        <br><br>
+
+        <a href="{{ url_for('home') }}">
+            Continue Shopping
+        </a>
+    </main>
+
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ product['name'] }} | Cash Online Store</title>
+    <meta name="description"
+          content="{{ product['description'] or 'Discover this product on Cash Online Store.' }}">
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="navbar">
+    <a class="logo" href="{{ url_for('home') }}">
+        <span class="logo-icon">N</span>
+        Cash Online Store
+    </a>
+    <nav class="nav-links">
+        <a href="{{ url_for('home') }}">Home</a>
+        {% if session.get('user_id') %}
+            <span>Welcome, {{ session.get('user_name') }}!</span>
+            {% if session.get('user_role') == 'seller' %}
+                <a href="{{ url_for('seller_dashboard') }}">
+                    Seller Dashboard
+                </a>
+            {% endif %}
+            <form method="POST" action="{{ url_for('logout') }}">
+                <button type="submit">Logout</button>
+            </form>
+        {% else %}
+            <a href="{{ url_for('login') }}">Login</a>
+            <a href="{{ url_for('register') }}">Sign Up</a>
+        {% endif %}
+    </nav>
+</header>
+<main class="section">
+    <p>
+        <a href="{{ url_for('home') }}">Home</a>
+        / {{ product['category'] }}
+        / {{ product['name'] }}
+    </p>
+    <div class="product-grid">
+        <div class="product-image">
+            {% if product['image'] %}
+                <img src="{{ product['image'] }}"
+                     alt="{{ product['name'] }}">
+            {% else %}
+                <p>No image available</p>
+            {% endif %}
+        </div>
+        <div class="product-info">
+            <span class="product-category">
+                {{ product['category'] }}
+            </span>
+            <h1>{{ product['name'] }}</h1>
+            <h2 class="price">
+                GH₵ {{ "%.2f"|format(product['price']) }}
+            </h2>
+            <h3>Product Description</h3>
+            <p>
+                {{ product['description'] or 'No description provided.' }}
+            </p>
+            <hr>
+            <h3>Seller Information</h3>
+            <p>
+                Seller:
+                <a href="{{ url_for('seller_profile', seller_id=product['seller_id']) }}">
+                    {{ product['seller_name'] }}
+                </a>
+            </p>
+            <a class="primary-button"
+               href="{{ url_for('buy_product', product_id=product['id']) }}">
+                Buy Now
+            </a>
+            <p class="muted">
+                You can browse products without an account.
+                You will be asked to log in or register when you choose to buy.
+            </p>
+        </div>
+    </div>
+</main>
+<footer class="footer">
+    <a class="logo footer-logo" href="{{ url_for('home') }}">
+        <span class="logo-icon">N</span>
+        Cash Online Store
+    </a>
+    <p>Buy. Sell. Grow.</p>
+    <p>&copy; 2026 Cash Online Store. All rights reserved.</p>
+</footer>
+</body>
+</html>

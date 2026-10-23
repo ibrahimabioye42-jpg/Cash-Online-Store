@@ -3,87 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Cash Online Store | Buy. Sell. Grow.</title>
-
     <meta name="description"
           content="Shop products from sellers on Cash Online Store, your online marketplace in Ghana.">
-
     <link rel="stylesheet"
           href="{{ url_for('static', filename='style.css') }}">
 </head>
-
 <body>
-
 <header class="navbar">
     <a class="logo" href="{{ url_for('home') }}">
         <span class="logo-icon">N</span>
         Cash Online Store
     </a>
-
-    <form class="search-form" action="{{ url_for('home') }}" method="GET">
+    <form class="search-form"
+          action="{{ url_for('home') }}"
+          method="GET">
         <input
             type="search"
             name="q"
             placeholder="Search products..."
             value="{{ search }}"
-            aria-label="Search products"
-        >
+            aria-label="Search products">
         <button type="submit">Search</button>
     </form>
-
     <nav class="nav-links">
         <a href="#products">Shop</a>
         <a href="#categories">Categories</a>
         <a href="#sell">Sell</a>
-       {% if session.get('user_id') %}
-    <span>Welcome, {{ session.get('user_name') }}!</span>
-
-    {% if session.get('user_role') == 'seller' %}
-        <a href="{{ url_for('seller_dashboard') }}">
-            Seller Dashboard
-        </a>
-    {% endif %}
-
-    <form method="POST" action="{{ url_for('logout') }}">
-        <button type="submit">Logout</button>
-    </form>
-{% else %}
-    <a href="{{ url_for('login') }}">Login</a>
-    <a href="{{ url_for('register') }}">Sign Up</a>
-{% endif %}
+        {% if session.get('user_id') %}
+            <span>Welcome, {{ session.get('user_name') }}!</span>
+            {% if session.get('user_role') == 'seller' %}
+                <a href="{{ url_for('seller_dashboard') }}">
+                    Seller Dashboard
+                </a>
+            {% endif %}
+            <form method="POST" action="{{ url_for('logout') }}">
+                <button type="submit">Logout</button>
+            </form>
+        {% else %}
+            <a href="{{ url_for('login') }}">Login</a>
+            <a href="{{ url_for('register') }}">Sign Up</a>
+        {% endif %}
     </nav>
 </header>
-
 <main>
-
+    <!-- HERO SECTION -->
     <section class="hero">
         <div class="hero-content">
             <span class="eyebrow">YOUR MARKETPLACE IN GHANA</span>
-
             <h1>Buy. Sell.<br><span>Grow.</span></h1>
-
             <p>
                 Discover great products, connect with sellers,
                 and grow your business with Cash Online Store.
             </p>
-
             <div class="hero-actions">
                 <a class="primary-button" href="#products">
                     Start Shopping
                 </a>
-
                 <a class="secondary-button" href="#sell">
                     Start Selling
                 </a>
             </div>
-
             <p class="hero-note">
-                Shop confidently. Pay securely through Paystack
-                when checkout is enabled.
+                Shop confidently. Payment processing will be available
+                when checkout payments are integrated.
             </p>
         </div>
-
         <div class="hero-art" aria-hidden="true">
             <div class="art-circle"></div>
             <div class="art-card">
@@ -95,7 +80,7 @@
             <div class="floating-tag">Made for shoppers</div>
         </div>
     </section>
-
+    <!-- BENEFITS SECTION -->
     <section class="benefits">
         <div class="benefit">
             <span class="benefit-icon">🛒</span>
@@ -104,15 +89,13 @@
                 <p>Find products in one place.</p>
             </div>
         </div>
-
         <div class="benefit">
             <span class="benefit-icon">🔒</span>
             <div>
                 <strong>Secure Payments</strong>
-                <p>Paystack integration coming next.</p>
+                <p>Payment integration coming next.</p>
             </div>
         </div>
-
         <div class="benefit">
             <span class="benefit-icon">🚀</span>
             <div>
@@ -121,36 +104,32 @@
             </div>
         </div>
     </section>
-
+    <!-- CATEGORIES SECTION -->
     <section id="categories" class="section">
         <div class="section-heading">
             <div>
                 <span class="eyebrow">EXPLORE</span>
                 <h2>Shop by category</h2>
             </div>
-            <a href="#products" class="text-link">View products →</a>
+            <a href="#products" class="text-link">
+                View products →
+            </a>
         </div>
-
-       <div class="category-list">
-    {% for category in categories %}
-    <a
-        class="category-chip
-        {% if selected_category|lower == category|lower %}active{% endif %}"
-        href="{{ url_for('home', q=search, category=category) }}"
-    >
-        {{ category }}
-    </a>
-    {% endfor %}
-
-    <a
-        class="category-chip"
-        href="{{ url_for('home', q=search) }}"
-    >
-        All Categories
-    </a>
-</div>
+        <div class="category-list">
+            {% for category in categories %}
+                <a
+                    class="category-chip {% if selected_category|lower == category['category']|lower %}active{% endif %}"
+                    href="{{ url_for('home', q=search, category=category['category']) }}">
+                    {{ category['category'] }}
+                </a>
+            {% endfor %}
+            <a class="category-chip"
+               href="{{ url_for('home', q=search) }}">
+                All Categories
+            </a>
+        </div>
     </section>
-
+    <!-- PRODUCTS SECTION -->
     <section id="products" class="section">
         <div class="section-heading">
             <div>
@@ -169,114 +148,137 @@
                 </p>
             </div>
         </div>
-
         {% if products %}
-        <div class="product-grid">
-            {% for product in products %}
-            <article class="product-card">
-                <a
-                    class="product-image"
-                    href="#product-{{ product.id }}"
-                    aria-label="View {{ product.name }}"
-                >
-                    <img
-                        src="{{ product.image }}"
-                        alt="{{ product.name }}"
-                        loading="lazy"
-                    >
-                    <span class="product-label">Name Heap</span>
-                </a>
-
-                <div class="product-info">
-                    <span class="product-category">
-                        {{ product.category }}
-                    </span>
-
-                    <h3>{{ product.name }}</h3>
-                    <p class="product-description">
-                        {{ product.description }}
-                    </p>
-
-                    <div class="product-bottom">
-                        <strong class="price">
-                            GH₵ {{ "{:,.2f}".format(product.price) }}
-                        </strong>
-
-                        <button
-                            class="add-button"
-                            type="button"
-                            onclick="addToCart({{ product.id }}, '{{ product.name }}')"
-                        >
-                            + Add
-                        </button>
-                    </div>
-                </div>
-            </article>
-            {% endfor %}
-        </div>
+            <div class="product-grid">
+                {% for product in products %}
+                    <article class="product-card">
+                        <!-- PRODUCT IMAGE -->
+                        <a class="product-image"
+                           href="{{ url_for('product_detail', product_id=product['id']) }}">
+                            {% if product['image'] %}
+                                <img
+                                    src="{{ product['image'] }}"
+                                    alt="{{ product['name'] }}"
+                                    loading="lazy">
+                            {% else %}
+                                <span>No image available</span>
+                            {% endif %}
+                        </a>
+                        <!-- PRODUCT INFORMATION -->
+                        <div class="product-info">
+                            <span class="product-category">
+                                {{ product['category'] }}
+                            </span>
+                            <h3>
+                                <a href="{{ url_for('product_detail', product_id=product['id']) }}">
+                                    {{ product['name'] }}
+                                </a>
+                            </h3>
+                            <p class="product-description">
+                                {{ product['description'] or 'No description provided.' }}
+                            </p>
+                            <p class="muted">
+                                Sold by
+                                <a href="{{ url_for('seller_profile', seller_id=product['seller_id']) }}">
+                                    {{ product['seller_name'] }}
+                                </a>
+                            </p>
+                            <!-- PRICE AND STOCK -->
+                            <div class="product-bottom">
+                                <strong class="price">
+                                    GH₵ {{ "%.2f"|format(product['price']) }}
+                                </strong>
+                            </div>
+                            {% if product['quantity'] > 0 %}
+                                <p class="stock-available">
+                                    In Stock: {{ product['quantity'] }}
+                                </p>
+                                <div class="product-actions">
+                                    <a
+                                        class="add-button"
+                                        href="{{ url_for('product_detail', product_id=product['id']) }}">
+                                        View Details
+                                    </a>
+                                    <a
+                                        class="add-button"
+                                        href="{{ url_for('buy_product', product_id=product['id']) }}">
+                                        Buy Now
+                                    </a>
+                                </div>
+                            {% else %}
+                                <p class="stock-out">
+                                    Out of Stock
+                                </p>
+                                <div class="product-actions">
+                                    <a
+                                        class="add-button"
+                                        href="{{ url_for('product_detail', product_id=product['id']) }}">
+                                        View Details
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
         {% else %}
-        <div class="empty-state">
-            <h3>No products found</h3>
-            <p>Try another search or browse all products.</p>
-            <a class="primary-button" href="{{ url_for('home') }}">
-                Show all products
-            </a>
-        </div>
+            <div class="empty-state">
+                <h3>
+                    {% if search or selected_category %}
+                        No products found
+                    {% else %}
+                        No products available yet
+                    {% endif %}
+                </h3>
+                <p>
+                    Try another search or check back later
+                    as sellers add their products.
+                </p>
+                <a class="primary-button"
+                   href="{{ url_for('home') }}">
+                    Show all products
+                </a>
+            </div>
         {% endif %}
     </section>
-
+    <!-- SELLER BANNER -->
     <section id="sell" class="seller-banner">
         <div>
             <span class="eyebrow">FOR BUSINESS OWNERS</span>
             <h2>Have something to sell?</h2>
             <p>
-                Join Cash Online Store. Publish your first five products
-                for free before choosing a monthly seller plan.
+                Join Cash Online Store. Publish your first five
+                products for free before choosing a monthly seller plan.
             </p>
         </div>
-
         <a class="primary-button"
-   href="{{ url_for('register') }}">
-    Become a Seller
-</a>
+           href="{{ url_for('register') }}">
+            Become a Seller
+        </a>
     </section>
-
+    <!-- ACCOUNT SECTION -->
     <section id="account" class="account-note">
         <h2>Your Cash Online Store journey starts here.</h2>
         <p>
-            Buyer and seller registration will be added in the next
-            development stage.
+            Create an account to buy products or register as a seller
+            to start listing your products.
         </p>
+        {% if not session.get('user_id') %}
+            <a class="primary-button"
+               href="{{ url_for('register') }}">
+                Create an Account
+            </a>
+        {% endif %}
     </section>
-
 </main>
-
+<!-- FOOTER -->
 <footer class="footer">
     <a class="logo footer-logo" href="{{ url_for('home') }}">
         <span class="logo-icon">N</span>
         Cash Online Store
     </a>
-
     <p>Buy. Sell. Grow.</p>
     <p>&copy; 2026 Cash Online Store. All rights reserved.</p>
 </footer>
-
-<div id="cart-notice" class="cart-notice" role="status"
-     aria-live="polite"></div>
-
-<script>
-    let cartCount = 0;
-
-    function addToCart(productId, productName) {
-        cartCount++;
-
-        const notice = document.getElementById("cart-notice");
-        notice.textContent =
-            productName + " selected. Items selected: " + cartCount;
-
-        notice.classList.add("visible");
-    }
-</script>
-
 </body>
 </html>

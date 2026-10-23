@@ -29,6 +29,7 @@
 
         <form method="POST" action="{{ url_for('login') }}">
             <div style="margin-bottom:16px;">
+                <input type="hidden" name="next" value="{{ next_url or '' }}">
                 <label for="email">Email address</label>
                 <input id="email" name="email" type="email"
                        autocomplete="email" required

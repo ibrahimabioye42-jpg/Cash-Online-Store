@@ -1,9 +1,10 @@
 from flask import (
     Flask, render_template, request,
-    redirect, url_for, session
+    redirect, url_for, session, abort
 )
 import sqlite3
 import os
+from urllib.parse import urlparse
 from werkzeug.security import (
     generate_password_hash,
     check_password_hash
@@ -15,93 +16,9 @@ app.secret_key = os.environ.get(
     "local-development-key-change-before-deployment"
 )
 
-# Sample products for the homepage
-products = [
-    {
-        "id": 1,
-        "name": "Wireless Headphones",
-        "category": "Electronics",
-        "price": 300,
-        "image": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600",
-        "description": "Enjoy your favourite music."
-    },
-    {
-        "id": 2,
-        "name": "Classic Sneakers",
-        "category": "Fashion",
-        "price": 450,
-        "image": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600",
-        "description": "Everyday style and comfort."
-    },
-    {
-        "id": 3,
-        "name": "Smart Watch",
-        "category": "Electronics",
-        "price": 550,
-        "image": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600",
-        "description": "Keep track of your day."
-    },
-    {
-        "id": 4,
-        "name": "Travel Backpack",
-        "category": "Fashion",
-        "price": 250,
-        "image": "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=600",
-        "description": "Carry your essentials anywhere."
-    },
-    {
-        "id": 5,
-        "name": "Camera",
-        "category": "Electronics",
-        "price": 1200,
-        "image": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600",
-        "description": "Capture special moments."
-    },
-    {
-        "id": 6,
-        "name": "Sunglasses",
-        "category": "Accessories",
-        "price": 120,
-        "image": "https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=600",
-        "description": "A simple finishing touch."
-    }
-]
-
-
-@app.route("/")
-def home():
-    search = request.args.get("q", "").strip()
-    category = request.args.get("category", "").strip()
-
-    filtered_products = products
-
-    if search:
-        filtered_products = [
-            product for product in filtered_products
-            if search.lower() in product["name"].lower()
-            or search.lower() in product["category"].lower()
-            or search.lower() in product["description"].lower()
-        ]
-
-    if category:
-        filtered_products = [
-            product for product in filtered_products
-            if product["category"].lower() == category.lower()
-        ]
-
-    categories = ["Electronics", "Fashion", "Accessories"]
-
-    return render_template(
-        "index.html",
-        products=filtered_products,
-        categories=categories,
-        search=search,
-        selected_category=category
-    )
-
-# Database file stored alongside app.py
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE = os.path.join(BASE_DIR, "cash_store.db")
+FREE_PRODUCT_LIMIT = 5
 
 
 def get_db_connection():
@@ -113,6 +30,7 @@ def get_db_connection():
 def init_db():
     connection = get_db_connection()
 
+    # Keep existing accounts intact.
     connection.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,14 +42,127 @@ def init_db():
         )
     """)
 
+    # Add products and link each product to its seller.
+    connection.execute("""
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            seller_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            price REAL NOT NULL CHECK(price >= 0),
+            quantity INTEGER NOT NULL DEFAULT 1 CHECK(quantity >= 0),
+            image TEXT,
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (seller_id) REFERENCES users(id)
+        )
+    """)
+
+    connection.execute("""
+        CREATE INDEX IF NOT EXISTS idx_products_seller
+        ON products(seller_id)
+    """)
+    # Store orders placed by buyers.
+    connection.execute("""
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            buyer_id INTEGER NOT NULL,
+            product_id INTEGER NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 1
+                CHECK(quantity > 0),
+            total_price REAL NOT NULL
+                CHECK(total_price >= 0),
+            status TEXT NOT NULL DEFAULT 'Pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (buyer_id) REFERENCES users(id),
+            FOREIGN KEY (product_id) REFERENCES products(id)
+        )
+    """)
+
     connection.commit()
     connection.close()
+
+
+def safe_next_url(target):
+    """Allow only local paths when redirecting after login."""
+    if not target:
+        return None
+
+    parsed = urlparse(target)
+
+    if parsed.scheme or parsed.netloc:
+        return None
+
+    if not target.startswith("/") or target.startswith("//"):
+        return None
+
+    return target
+
+
+@app.route("/")
+def home():
+    search = request.args.get("q", "").strip()
+    category = request.args.get("category", "").strip()
+
+    query = """
+        SELECT
+            p.*,
+            u.name AS seller_name
+        FROM products p
+        JOIN users u ON u.id = p.seller_id
+        WHERE u.role = 'seller'
+    """
+    parameters = []
+
+    if search:
+        query += """
+            AND (
+                p.name LIKE ?
+                OR p.category LIKE ?
+                OR p.description LIKE ?
+                OR u.name LIKE ?
+            )
+        """
+        term = f"%{search}%"
+        parameters.extend([term, term, term, term])
+
+    if category:
+        query += " AND p.category = ?"
+        parameters.append(category)
+
+    query += " ORDER BY p.created_at DESC, p.id DESC"
+
+    connection = get_db_connection()
+    try:
+        products = connection.execute(
+            query, parameters
+        ).fetchall()
+
+        categories = connection.execute("""
+            SELECT DISTINCT category
+            FROM products
+            WHERE quantity > 0
+            ORDER BY category
+        """).fetchall()
+    finally:
+        connection.close()
+
+    return render_template(
+        "index.html",
+        products=products,
+        categories=categories,
+        search=search,
+        selected_category=category
+    )
 
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
     error = None
     success = None
+    next_url = safe_next_url(
+    request.args.get("next") or request.form.get("next")
+)
 
     if request.method == "POST":
         name = request.form.get("name", "").strip()
@@ -141,43 +172,45 @@ def register():
 
         if not name or not email or not password:
             error = "Please complete all required fields."
-
         elif len(password) < 8:
             error = "Your password must be at least 8 characters."
-
         elif role not in ("buyer", "seller"):
             error = "Please select a valid account type."
-
         else:
-            password_hash = generate_password_hash(password)
             connection = get_db_connection()
-
             try:
-                connection.execute(
-                    """
+                connection.execute("""
                     INSERT INTO users
                     (name, email, password_hash, role)
                     VALUES (?, ?, ?, ?)
-                    """,
-                    (name, email, password_hash, role)
-                )
+                """, (
+                    name,
+                    email,
+                    generate_password_hash(password),
+                    role
+                ))
                 connection.commit()
-                success = "Account created successfully!"
-
+                success = "Account created successfully! You can now log in."
             except sqlite3.IntegrityError:
                 error = "That email address is already registered."
-
             finally:
                 connection.close()
 
     return render_template(
         "register.html",
         error=error,
-        success=success
+        success=success,
+        next_url=next_url
     )
+
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = None
+    next_url = safe_next_url(
+        request.args.get("next") or request.form.get("next")
+    )
 
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
@@ -195,25 +228,34 @@ def login():
         if user and check_password_hash(
             user["password_hash"], password
         ):
+            # Do not let a seller use buyer-only purchase routes.
             session.clear()
             session["user_id"] = user["id"]
             session["user_name"] = user["name"]
             session["user_role"] = user["role"]
 
-        if user["role"] == "seller":
-             return redirect(url_for("seller_dashboard"))
+            if user["role"] == "seller":
+                return redirect(url_for("seller_dashboard"))
 
-             return redirect(url_for("home"))
+            if next_url:
+                return redirect(next_url)
+
+            return redirect(url_for("home"))
 
         error = "Invalid email address or password."
 
-    return render_template("login.html", error=error)
+    return render_template(
+        "login.html",
+        error=error,
+        next_url=next_url
+    )
 
 
 @app.route("/logout", methods=["POST"])
 def logout():
     session.clear()
     return redirect(url_for("home"))
+
 
 @app.route("/seller/dashboard")
 def seller_dashboard():
@@ -223,10 +265,259 @@ def seller_dashboard():
     if session.get("user_role") != "seller":
         return redirect(url_for("home"))
 
-    return render_template("seller_dashboard.html")
+    connection = get_db_connection()
+    try:
+        my_products = connection.execute("""
+            SELECT *
+            FROM products
+            WHERE seller_id = ?
+            ORDER BY created_at DESC, id DESC
+        """, (session["user_id"],)).fetchall()
+
+        count = connection.execute("""
+            SELECT COUNT(*) AS total
+            FROM products
+            WHERE seller_id = ?
+        """, (session["user_id"],)).fetchone()["total"]
+    finally:
+        connection.close()
+
+    return render_template(
+        "seller_dashboard.html",
+        products=my_products,
+        product_count=count,
+        product_limit=FREE_PRODUCT_LIMIT
+    )
 
 
-# Create the database and users table if they don't exist
+@app.route("/seller/product/add", methods=["GET", "POST"])
+def add_product():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user_role") != "seller":
+        return redirect(url_for("home"))
+
+    error = None
+
+    connection = get_db_connection()
+    try:
+        count = connection.execute("""
+            SELECT COUNT(*) AS total
+            FROM products
+            WHERE seller_id = ?
+        """, (session["user_id"],)).fetchone()["total"]
+    finally:
+        connection.close()
+
+    if count >= FREE_PRODUCT_LIMIT:
+        return render_template(
+            "add_product.html",
+            error="You have reached your free limit of 5 products."
+        )
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        category = request.form.get("category", "").strip()
+        description = request.form.get("description", "").strip()
+        image = request.form.get("image", "").strip()
+        price_text = request.form.get("price", "").strip()
+        quantity_text = request.form.get("quantity", "1").strip()
+
+        try:
+            price = float(price_text)
+            quantity = int(quantity_text)
+
+            if not name or not category:
+                raise ValueError("Enter a product name and category.")
+
+            if price < 0 or quantity < 0:
+                raise ValueError("Price and quantity cannot be negative.")
+
+        except ValueError as exc:
+            error = str(exc) or "Enter a valid price and quantity."
+        else:
+            connection = get_db_connection()
+            try:
+                # Recheck the limit before inserting.
+                current_count = connection.execute("""
+                    SELECT COUNT(*) AS total
+                    FROM products
+                    WHERE seller_id = ?
+                """, (session["user_id"],)).fetchone()["total"]
+
+                if current_count >= FREE_PRODUCT_LIMIT:
+                    error = "You have reached your free limit of 5 products."
+                else:
+                    connection.execute("""
+                        INSERT INTO products
+                        (seller_id, name, category, price,
+                         quantity, image, description)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        session["user_id"], name, category,
+                        price, quantity, image, description
+                    ))
+                    connection.commit()
+            finally:
+                connection.close()
+
+            if not error:
+                return redirect(url_for("seller_dashboard"))
+
+    return render_template("add_product.html", error=error)
+
+
+@app.route("/product/<int:product_id>")
+def product_detail(product_id):
+    connection = get_db_connection()
+    try:
+        product = connection.execute("""
+            SELECT p.*, u.name AS seller_name
+            FROM products p
+            JOIN users u ON u.id = p.seller_id
+            WHERE p.id = ? AND u.role = 'seller'
+        """, (product_id,)).fetchone()
+    finally:
+        connection.close()
+
+    if product is None:
+        abort(404)
+
+    return render_template("product.html", product=product)
+
+
+@app.route("/seller/<int:seller_id>")
+def seller_profile(seller_id):
+    connection = get_db_connection()
+    try:
+        seller = connection.execute("""
+            SELECT id, name, created_at
+            FROM users
+            WHERE id = ? AND role = 'seller'
+        """, (seller_id,)).fetchone()
+
+        if seller is None:
+            abort(404)
+
+        products = connection.execute("""
+            SELECT *
+            FROM products
+            WHERE seller_id = ? AND quantity > 0
+            ORDER BY created_at DESC, id DESC
+        """, (seller_id,)).fetchall()
+    finally:
+        connection.close()
+
+    return render_template(
+        "seller_profile.html",
+        seller=seller,
+        products=products
+    )
+
+
+@app.route("/buy/<int:product_id>")
+def buy_product(product_id):
+    if "user_id" not in session:
+        return redirect(url_for(
+            "login",
+            next=url_for("buy_product", product_id=product_id)
+        ))
+
+    if session.get("user_role") != "buyer":
+        return "Only buyer accounts can purchase products.", 403
+
+    connection = get_db_connection()
+    try:
+        product = connection.execute("""
+            SELECT p.*, u.name AS seller_name
+            FROM products p
+            JOIN users u ON u.id = p.seller_id
+            WHERE p.id = ?
+              AND p.quantity > 0
+              AND u.role = 'seller'
+        """, (product_id,)).fetchone()
+    finally:
+        connection.close()
+
+    if product is None:
+        abort(404)
+
+    return render_template("checkout.html", product=product)
+
+@app.route("/checkout/<int:product_id>", methods=["POST"])
+def checkout(product_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user_role") != "buyer":
+        return "Only buyer accounts can place orders.", 403
+
+    try:
+        quantity = int(request.form.get("quantity", "1"))
+        if quantity < 1:
+            raise ValueError
+    except ValueError:
+        return "Please enter a valid quantity.", 400
+
+    connection = get_db_connection()
+    try:
+        # Recheck stock immediately before creating the order.
+        product = connection.execute("""
+            SELECT p.id, p.price, p.quantity
+            FROM products p
+            JOIN users u ON u.id = p.seller_id
+            WHERE p.id = ? AND u.role = 'seller'
+        """, (product_id,)).fetchone()
+
+        if product is None:
+            abort(404)
+
+        if quantity > product["quantity"]:
+            return "Sorry, there is not enough stock available.", 400
+
+        total_price = product["price"] * quantity
+
+        connection.execute("""
+            INSERT INTO orders
+                (buyer_id, product_id, quantity, total_price)
+            VALUES (?, ?, ?, ?)
+        """, (
+            session["user_id"],
+            product_id,
+            quantity,
+            total_price
+        ))
+
+        # Reduce available stock.
+        connection.execute("""
+            UPDATE products
+            SET quantity = quantity - ?
+            WHERE id = ? AND quantity >= ?
+        """, (quantity, product_id, quantity))
+
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+    return redirect(url_for("order_success"))
+
+@app.route("/order-success")
+def order_success():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user_role") != "buyer":
+        return redirect(url_for("home"))
+
+    return render_template("order_success.html")
+
+
+# Create missing tables without deleting existing records.
 init_db()
 
 if __name__ == "__main__":

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Product | Cash Online Store</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="navbar">
+    <a class="logo" href="{{ url_for('home') }}">
+        <span class="logo-icon">C</span>
+        Cash Online Store
+    </a>
+</header>
+
+<main class="section">
+    <div class="account-note">
+        <h2>Add a Product</h2>
+        <p>List a product for buyers to discover in Cash Online Store.</p>
+        <p>You can list up to 5 products for free.</p>
+
+        {% if error %}
+        <p role="alert" style="color:#c62828;">{{ error }}</p>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('add_product') }}">
+            <p>
+                <label for="name">Product name</label>
+                <input id="name" name="name" required maxlength="150"
+                       style="display:block;width:100%;padding:12px;">
+            </p>
+
+            <p>
+                <label for="category">Category</label>
+                <select id="category" name="category" required
+                        style="display:block;width:100%;padding:12px;">
+                    <option value="">Choose a category</option>
+                    <option>Electronics</option>
+                    <option>Phones</option>
+                    <option>Fashion</option>
+                    <option>Shoes</option>
+                    <option>Beauty and Perfumes</option>
+                    <option>Home and Living</option>
+                    <option>Accessories</option>
+                    <option>Other</option>
+                </select>
+            </p>
+
+            <p>
+                <label for="price">Price (GH₵)</label>
+                <input id="price" name="price" type="number"
+                       min="0" step="0.01" required
+                       style="display:block;width:100%;padding:12px;">
+            </p>
+
+            <p>
+                <label for="quantity">Quantity available</label>
+                <input id="quantity" name="quantity" type="number"
+                       min="0" value="1" required
+                       style="display:block;width:100%;padding:12px;">
+            </p>
+
+            <p>
+                <label for="image">Product image URL (optional)</label>
+                <input id="image" name="image" type="url"
+                       placeholder="https://example.com/product.jpg"
+                       style="display:block;width:100%;padding:12px;">
+            </p>
+
+            <p>
+                <label for="description">Description</label>
+                <textarea id="description" name="description" rows="4"
+                          maxlength="2000"
+                          style="display:block;width:100%;padding:12px;"></textarea>
+            </p>
+
+            <button class="primary-button" type="submit">
+                Publish Product
+            </button>
+        </form>
+
+        <p><a href="{{ url_for('seller_dashboard') }}">Back to Dashboard</a></p>
+    </div>
+</main>
+</body>
+</html>
