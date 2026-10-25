@@ -15,6 +15,16 @@ from werkzeug.security import (
 import uuid
 from werkzeug.utils import secure_filename
 
+import os
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
+import uuid
+from datetime import datetime, date
+PAYSTACK_SECRET_KEY = os.getenv("PAYSTACK_SECRET_KEY")
+
 app = Flask(__name__)
 app.secret_key = os.environ.get(
     "FLASK_SECRET_KEY",
@@ -109,9 +119,76 @@ def init_db():
     )
 """)
 
-    connection.commit()
-    connection.close()
+    connection.execute("""
+        CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL,
+            reference TEXT NOT NULL UNIQUE,
+            amount_kobo INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'initialized',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (order_id) REFERENCES orders(id)
+        )
+    """)
 
+    columns = [      
+            row["name"]
+            for row in connection.execute(
+                "PRAGMA table_info(orders)"
+            ).fetchall()
+        ]
+        
+    if "payment_status" not in columns:
+            connection.execute("""
+                ALTER TABLE orders
+                ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'Unpaid'
+            """)
+        # Check existing order columns
+    order_columns = [
+        row["name"]
+        for row in connection.execute(
+            "PRAGMA table_info(orders)"
+        ).fetchall()
+    ]
+
+    # Add delivery information without deleting existing orders
+    delivery_columns = {
+        "delivery_region": "TEXT",
+        "delivery_town": "TEXT",
+        "delivery_address": "TEXT",
+        "delivery_phone": "TEXT",
+        "expected_delivery_date": "TEXT",
+        "delivery_start_time": "TEXT",
+        "delivery_end_time": "TEXT",
+        "delivery_status": "TEXT NOT NULL DEFAULT 'Pending'",
+        "delivered_at": "TEXT"
+    }
+
+    for column_name, column_type in delivery_columns.items():
+        if column_name not in order_columns:
+            connection.execute(
+                f"ALTER TABLE orders ADD COLUMN {column_name} {column_type}"
+            )
+
+    # Store buyer reviews of sellers
+    connection.execute("""
+        CREATE TABLE IF NOT EXISTS seller_reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL UNIQUE,
+            buyer_id INTEGER NOT NULL,
+            seller_id INTEGER NOT NULL,
+            rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+            comment TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (order_id) REFERENCES orders(id),
+            FOREIGN KEY (buyer_id) REFERENCES users(id),
+            FOREIGN KEY (seller_id) REFERENCES users(id)
+        )
+    """)            
+        
+    connection.commit() 
+    connection.close() 
+    
 
 def safe_next_url(target):
     """Allow only local paths when redirecting after login."""
@@ -296,27 +373,57 @@ def seller_dashboard():
         return redirect(url_for("home"))
 
     connection = get_db_connection()
+
     try:
-        my_products = connection.execute("""
+        # Count all orders for this seller's products
+        stats = connection.execute("""
+            SELECT
+                COUNT(o.id) AS total_orders,
+
+                COALESCE(SUM(
+                    CASE
+                        WHEN o.payment_status = 'Paid' THEN 1
+                        ELSE 0
+                    END
+                ), 0) AS paid_orders,
+
+                COALESCE(SUM(
+                    CASE
+                        WHEN o.payment_status IS NULL
+                             OR o.payment_status != 'Paid'
+                        THEN 1
+                        ELSE 0
+                    END
+                ), 0) AS unpaid_orders,
+
+                COALESCE(SUM(
+                    CASE
+                        WHEN o.payment_status = 'Paid'
+                        THEN o.total_price
+                        ELSE 0
+                    END
+                ), 0) AS total_revenue
+
+            FROM orders o
+            JOIN products p ON p.id = o.product_id
+            WHERE p.seller_id = ?
+        """, (session["user_id"],)).fetchone()
+
+        # Keep the seller's existing product list available
+        products = connection.execute("""
             SELECT *
             FROM products
             WHERE seller_id = ?
-            ORDER BY created_at DESC, id DESC
+            ORDER BY id DESC
         """, (session["user_id"],)).fetchall()
 
-        count = connection.execute("""
-            SELECT COUNT(*) AS total
-            FROM products
-            WHERE seller_id = ?
-        """, (session["user_id"],)).fetchone()["total"]
     finally:
         connection.close()
 
     return render_template(
         "seller_dashboard.html",
-        products=my_products,
-        product_count=count,
-        product_limit=FREE_PRODUCT_LIMIT
+        stats=stats,
+        products=products
     )
 
 @app.route("/seller/orders")
@@ -336,7 +443,16 @@ def seller_orders():
                 o.quantity,
                 o.total_price,
                 o.status,
+                o.payment_status,
                 o.created_at,
+                o.delivery_region,
+                o.delivery_town,
+                o.delivery_address,
+                o.delivery_phone,
+                o.expected_delivery_date,
+                o.delivery_start_time,
+                o.delivery_end_time,
+                o.delivery_status,
                 p.name AS product_name,
                 p.image AS product_image,
                 u.name AS buyer_name,
@@ -347,10 +463,244 @@ def seller_orders():
             WHERE p.seller_id = ?
             ORDER BY o.created_at DESC, o.id DESC
         """, (session["user_id"],)).fetchall()
+
     finally:
         connection.close()
 
     return render_template("seller_orders.html", orders=orders)
+
+@app.route("/seller/update-delivery/<int:order_id>", methods=["POST"])
+def update_delivery(order_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user_role") != "seller":
+        return "Only sellers can update delivery details.", 403
+
+    delivery_date = request.form.get(
+        "expected_delivery_date", ""
+    ).strip()
+    start_time = request.form.get(
+        "delivery_start_time", ""
+    ).strip()
+    end_time = request.form.get(
+        "delivery_end_time", ""
+    ).strip()
+    delivery_status = request.form.get(
+        "delivery_status", ""
+    ).strip()
+
+    allowed_statuses = [
+        "Pending",
+        "Scheduled",
+        "Out for Delivery",
+        "Delivered"
+    ]
+
+    if delivery_status not in allowed_statuses:
+        return "Invalid delivery status.", 400
+
+    # Validate the date if one was entered
+    if delivery_date:
+        try:
+            parsed_date = datetime.strptime(
+                delivery_date, "%Y-%m-%d"
+            ).date()
+
+            if parsed_date < date.today():
+                return "The delivery date cannot be in the past.", 400
+
+        except ValueError:
+            return "Please enter a valid delivery date.", 400
+
+    # Validate the time window if provided
+    if bool(start_time) != bool(end_time):
+        return "Enter both the start and end times.", 400
+
+    if start_time and end_time:
+        try:
+            start = datetime.strptime(start_time, "%H:%M")
+            end = datetime.strptime(end_time, "%H:%M")
+
+            if start >= end:
+                return "End time must be later than start time.", 400
+
+        except ValueError:
+            return "Please enter valid delivery times.", 400
+
+    if delivery_status == "Scheduled":
+        if not delivery_date or not start_time or not end_time:
+            return (
+                "Enter a delivery date, start time, and end time "
+                "before scheduling.",
+                400
+            )
+
+    connection = get_db_connection()
+
+    try:
+        # Ensure this order belongs to the logged-in seller
+        order = connection.execute("""
+            SELECT o.id, o.buyer_id, p.name AS product_name
+            FROM orders o
+            JOIN products p ON p.id = o.product_id
+            WHERE o.id = ? AND p.seller_id = ?
+        """, (order_id, session["user_id"])).fetchone()
+
+        if order is None:
+            abort(404)
+
+        # Prevent changing a completed delivery
+        current = connection.execute("""
+            SELECT delivery_status
+            FROM orders
+            WHERE id = ?
+        """, (order_id,)).fetchone()
+
+        if current["delivery_status"] == "Delivered":
+            return "This order is already marked as delivered.", 400
+
+        delivered_at = (
+            datetime.now().isoformat(timespec="seconds")
+            if delivery_status == "Delivered"
+            else None
+        )
+
+        connection.execute("""
+            UPDATE orders
+            SET expected_delivery_date = ?,
+                delivery_start_time = ?,
+                delivery_end_time = ?,
+                delivery_status = ?,
+                delivered_at = ?
+            WHERE id = ?
+        """, (
+            delivery_date or None,
+            start_time or None,
+            end_time or None,
+            delivery_status,
+            delivered_at,
+            order_id
+        ))
+
+        # Notify the buyer about the delivery update
+        message = (
+            f"Delivery update for {order['product_name']}: "
+            f"{delivery_status}."
+        )
+
+        if delivery_date:
+            message += f" Expected date: {delivery_date}."
+
+        if start_time and end_time:
+            message += f" Time window: {start_time}–{end_time}."
+
+        connection.execute("""
+            INSERT INTO notifications (user_id, order_id, message)
+            VALUES (?, ?, ?)
+        """, (
+            order["buyer_id"],
+            order_id,
+            message
+        ))
+
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+    return redirect(url_for("seller_orders"))
+
+@app.route("/review-seller/<int:order_id>", methods=["POST"])
+def review_seller(order_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user_role") != "buyer":
+        return "Only buyers can review sellers.", 403
+
+    # Validate the rating
+    try:
+        rating = int(request.form.get("rating", ""))
+        if rating < 1 or rating > 5:
+            raise ValueError
+    except (ValueError, TypeError):
+        return "Please select a rating from 1 to 5.", 400
+
+    comment = request.form.get("comment", "").strip()
+
+    if len(comment) > 1000:
+        return "Your review must be 1000 characters or fewer.", 400
+
+    connection = get_db_connection()
+
+    try:
+        # Confirm the order belongs to this buyer and was delivered
+        order = connection.execute("""
+            SELECT
+                o.id,
+                o.buyer_id,
+                o.delivery_status,
+                p.seller_id,
+                p.name AS product_name
+            FROM orders o
+            JOIN products p ON p.id = o.product_id
+            WHERE o.id = ? AND o.buyer_id = ?
+        """, (order_id, session["user_id"])).fetchone()
+
+        if order is None:
+            abort(404)
+
+        if order["delivery_status"] != "Delivered":
+            return "You can review the seller after delivery.", 400
+
+        # Prevent duplicate reviews for the same order
+        existing_review = connection.execute("""
+            SELECT id
+            FROM seller_reviews
+            WHERE order_id = ?
+        """, (order_id,)).fetchone()
+
+        if existing_review:
+            return "You have already reviewed this order.", 400
+
+        # Save the review
+        connection.execute("""
+            INSERT INTO seller_reviews
+                (order_id, buyer_id, seller_id, rating, comment)
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            order_id,
+            session["user_id"],
+            order["seller_id"],
+            rating,
+            comment or None
+        ))
+
+        # Notify the seller
+        connection.execute("""
+            INSERT INTO notifications (user_id, order_id, message)
+            VALUES (?, ?, ?)
+        """, (
+            order["seller_id"],
+            order_id,
+            f"A buyer reviewed your product: {order['product_name']}."
+        ))
+
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+    return redirect(url_for("my_orders"))
 
 @app.route("/seller/orders/<int:order_id>/status", methods=["POST"])
 def update_order_status(order_id):
@@ -616,7 +966,7 @@ def checkout(product_id):
     if session.get("user_role") != "buyer":
         return "Only buyer accounts can place orders.", 403
 
-    # Get and validate quantity
+    # Validate quantity
     try:
         quantity = int(request.form.get("quantity", "1"))
         if quantity < 1:
@@ -624,10 +974,24 @@ def checkout(product_id):
     except (ValueError, TypeError):
         return "Please enter a valid quantity.", 400
 
+    # Get delivery details from the checkout form
+    delivery_region = request.form.get("delivery_region", "").strip()
+    delivery_town = request.form.get("delivery_town", "").strip()
+    delivery_address = request.form.get("delivery_address", "").strip()
+    delivery_phone = request.form.get("delivery_phone", "").strip()
+
+    if not all([
+        delivery_region,
+        delivery_town,
+        delivery_address,
+        delivery_phone
+    ]):
+        return "Please complete all delivery details.", 400
+
     connection = get_db_connection()
 
     try:
-        # Retrieve the product and seller
+        # Retrieve product and seller
         product = connection.execute("""
             SELECT p.id, p.name, p.price, p.quantity, p.seller_id
             FROM products p
@@ -641,19 +1005,30 @@ def checkout(product_id):
         if quantity > product["quantity"]:
             return "Sorry, there is not enough stock available.", 400
 
-        # Calculate total price
         total_price = product["price"] * quantity
 
-        # Insert the order
+        # Create order with delivery details
         cursor = connection.execute("""
-            INSERT INTO orders
-                (buyer_id, product_id, quantity, total_price)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO orders (
+                buyer_id,
+                product_id,
+                quantity,
+                total_price,
+                delivery_region,
+                delivery_town,
+                delivery_address,
+                delivery_phone
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             session["user_id"],
             product_id,
             quantity,
-            total_price
+            total_price,
+            delivery_region,
+            delivery_town,
+            delivery_address,
+            delivery_phone
         ))
 
         order_id = cursor.lastrowid
@@ -687,7 +1062,10 @@ def checkout(product_id):
     finally:
         connection.close()
 
-    return redirect(url_for("order_success"))
+    # Continue to Paystack payment
+    return redirect(
+        url_for("initialize_payment", order_id=order_id)
+    )
 @app.route("/order-success")
 def order_success():
     if "user_id" not in session:
@@ -707,29 +1085,74 @@ def my_orders():
         return redirect(url_for("home"))
 
     connection = get_db_connection()
+
     try:
         orders = connection.execute("""
             SELECT
-                o.id AS order_id,
+                o.id AS id,
                 o.quantity,
                 o.total_price,
                 o.status,
+                o.payment_status,
                 o.created_at,
+
+                o.delivery_region,
+                o.delivery_town,
+                o.delivery_address,
+                o.delivery_phone,
+                o.expected_delivery_date,
+                o.delivery_start_time,
+                o.delivery_end_time,
+                o.delivery_status,
+                o.delivered_at,
+
                 p.name AS product_name,
                 p.image AS product_image,
-                p.category AS product_category,
-                u.name AS seller_name
-            FROM orders o
-            JOIN products p ON p.id = o.product_id
-            JOIN users u ON u.id = p.seller_id
+                p.price AS product_price,
+
+                seller.name AS seller_name,
+
+                (
+                    SELECT sr.id
+                    FROM seller_reviews AS sr
+                    WHERE sr.order_id = o.id
+                      AND sr.buyer_id = o.buyer_id
+                ) AS review_id,
+
+                (
+                    SELECT sr.rating
+                    FROM seller_reviews AS sr
+                    WHERE sr.order_id = o.id
+                      AND sr.buyer_id = o.buyer_id
+                ) AS review_rating,
+
+                (
+                    SELECT sr.comment
+                    FROM seller_reviews AS sr
+                    WHERE sr.order_id = o.id
+                      AND sr.buyer_id = o.buyer_id
+                ) AS review_comment
+
+            FROM orders AS o
+
+            JOIN products AS p
+                ON p.id = o.product_id
+
+            JOIN users AS seller
+                ON seller.id = p.seller_id
+
             WHERE o.buyer_id = ?
+
             ORDER BY o.created_at DESC, o.id DESC
         """, (session["user_id"],)).fetchall()
+
     finally:
         connection.close()
 
-    return render_template("my_orders.html", orders=orders)
-
+    return render_template(
+        "my_orders.html",
+        orders=orders
+    )
 @app.route("/notifications")
 def notifications():
     if "user_id" not in session:
@@ -756,6 +1179,191 @@ def notifications():
         connection.close()
 
     return render_template("notifications.html", notifications=items)
+
+@app.route("/pay/<int:order_id>")
+def initialize_payment(order_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user_role") != "buyer":
+        return redirect(url_for("home"))
+
+    if not PAYSTACK_SECRET_KEY:
+        return "Paystack secret key is missing from .env.", 500
+
+    connection = get_db_connection()
+
+    try:
+        order = connection.execute("""
+            SELECT o.id, o.total_price, u.email
+            FROM orders o
+            JOIN users u ON u.id = o.buyer_id
+            WHERE o.id = ? AND o.buyer_id = ?
+        """, (order_id, session["user_id"])).fetchone()
+
+        if order is None:
+            abort(404)
+
+        paid = connection.execute("""
+            SELECT id FROM payments
+            WHERE order_id = ? AND status = 'success'
+        """, (order_id,)).fetchone()
+
+        if paid:
+            return "This order has already been paid.", 400
+
+        amount_kobo = round(float(order["total_price"]) * 100)
+        reference = "COS-" + uuid.uuid4().hex
+
+        connection.execute("""
+            INSERT INTO payments
+                (order_id, reference, amount_kobo, status)
+            VALUES (?, ?, ?, 'initialized')
+        """, (order_id, reference, amount_kobo))
+
+        connection.commit()
+
+        payload = {
+            "email": order["email"],
+            "amount": amount_kobo,
+            "currency": "GHS",
+            "reference": reference,
+            "callback_url": url_for(
+                "verify_payment", _external=True
+            )
+        }
+
+        response = requests.post(
+            "https://api.paystack.co/transaction/initialize",
+            headers={
+                "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
+                "Content-Type": "application/json"
+            },
+            json=payload,
+            timeout=30
+        )
+
+        result = response.json()
+
+        if response.ok and result.get("status"):
+            return redirect(
+                result["data"]["authorization_url"]
+            )
+
+        connection.execute("""
+            UPDATE payments
+            SET status = 'failed'
+            WHERE reference = ?
+        """, (reference,))
+        connection.commit()
+
+        return "Could not start payment. Please try again.", 502
+
+    except requests.RequestException:
+        connection.rollback()
+        return "Could not connect to Paystack. Please try again.", 502
+
+    finally:
+        connection.close()
+
+
+@app.route("/payment/callback")
+def verify_payment():
+    reference = request.args.get("reference", "").strip()
+
+    if not reference:
+        return "Payment reference is missing.", 400
+
+    if not PAYSTACK_SECRET_KEY:
+        return "Paystack secret key is missing.", 500
+
+    connection = get_db_connection()
+
+    try:
+        payment = connection.execute("""
+            SELECT p.id, p.order_id, p.amount_kobo, p.status,
+                   o.buyer_id
+            FROM payments p
+            JOIN orders o ON o.id = p.order_id
+            WHERE p.reference = ?
+        """, (reference,)).fetchone()
+
+        if payment is None:
+            abort(404)
+
+        if payment["status"] == "success":
+            return render_template(
+                "payment_result.html",
+                success=True,
+                message="This payment has already been verified."
+            )
+
+        response = requests.get(
+            "https://api.paystack.co/transaction/verify/"
+            + requests.utils.quote(reference, safe=""),
+            headers={
+                "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}"
+            },
+            timeout=30
+        )
+
+        result = response.json()
+
+        if not response.ok or not result.get("status"):
+            return "Could not verify payment. Please try again.", 502
+
+        transaction = result.get("data", {})
+
+        valid_payment = (
+            transaction.get("status") == "success"
+            and transaction.get("reference") == reference
+            and transaction.get("amount") == payment["amount_kobo"]
+            and transaction.get("currency") == "GHS"
+        )
+
+        if valid_payment:
+            connection.execute("""
+                UPDATE payments
+                SET status = 'success'
+                WHERE id = ?
+            """, (payment["id"],))
+
+            connection.execute("""
+    UPDATE orders
+    SET payment_status = 'Paid'
+    WHERE id = ?
+""", (payment["order_id"],))
+            
+
+            connection.commit()
+
+            return render_template(
+                "payment_result.html",
+                success=True,
+                message="Payment verified successfully!"
+            )
+
+        if transaction.get("status") in ("failed", "abandoned"):
+            connection.execute("""
+                UPDATE payments
+                SET status = 'failed'
+                WHERE id = ?
+            """, (payment["id"],))
+            connection.commit()
+
+        return render_template(
+            "payment_result.html",
+            success=False,
+            message="Payment is not confirmed. Do not pay again "
+                    "until you check your order and payment status."
+        )
+
+    except requests.RequestException:
+        connection.rollback()
+        return "Could not contact Paystack to verify payment.", 502
+
+    finally:
+        connection.close()
 
 
 

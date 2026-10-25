@@ -23,6 +23,27 @@
         <a class="primary-button" href="{{ url_for('add_product') }}">
     Add Product
 </a>
+<section class="dashboard-stats">
+    <div class="stat-card">
+        <h3>Total Orders</h3>
+        <p>{{ stats['total_orders'] }}</p>
+    </div>
+
+    <div class="stat-card">
+        <h3>Paid Orders</h3>
+        <p>{{ stats['paid_orders'] }}</p>
+    </div>
+
+    <div class="stat-card">
+        <h3>Unpaid Orders</h3>
+        <p>{{ stats['unpaid_orders'] }}</p>
+    </div>
+
+    <div class="stat-card">
+        <h3>Total Revenue</h3>
+        <p>GH₵ {{ "%.2f"|format(stats['total_revenue']) }}</p>
+    </div>
+</section>
 <p>
     Products listed: {{ product_count }} / {{ product_limit }}
 </p>

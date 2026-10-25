@@ -44,6 +44,54 @@
                                 <strong>Quantity:</strong>
                                 {{ order['quantity'] }}
                             </p>
+                            <div class="delivery-information">
+    <h3>Delivery Information</h3>
+
+    <p>
+        <strong>Buyer:</strong>
+        {{ order['buyer_name'] }}
+    </p>
+
+    <p>
+        <strong>Phone:</strong>
+        {{ order['delivery_phone'] or 'Not provided' }}
+    </p>
+
+    <p>
+        <strong>Region:</strong>
+        {{ order['delivery_region'] or 'Not provided' }}
+    </p>
+
+    <p>
+        <strong>Town:</strong>
+        {{ order['delivery_town'] or 'Not provided' }}
+    </p>
+
+    <p>
+        <strong>Address:</strong>
+        {{ order['delivery_address'] or 'Not provided' }}
+    </p>
+
+    <p>
+        <strong>Expected delivery:</strong>
+        {{ order['expected_delivery_date'] or 'Not scheduled' }}
+    </p>
+
+    <p>
+        <strong>Delivery time:</strong>
+        {% if order['delivery_start_time'] and order['delivery_end_time'] %}
+            {{ order['delivery_start_time'] }} -
+            {{ order['delivery_end_time'] }}
+        {% else %}
+            Not scheduled
+        {% endif %}
+    </p>
+
+    <p>
+        <strong>Delivery status:</strong>
+        {{ order['delivery_status'] or 'Pending' }}
+    </p>
+</div>
                             <p>
                                 <strong>Total:</strong>
                                 GH₵ {{ "%.2f"|format(order['total_price']) }}
@@ -57,6 +105,72 @@
                                 {{ order['status'] }}
                             </p>
                             <form
+
+            <form
+    method="POST"
+    action="{{ url_for('update_delivery', order_id=order['order_id']) }}"
+    class="delivery-update-form"
+>
+    <h3>Update Delivery</h3>
+
+    <label for="delivery_date_{{ order['order_id'] }}">
+        Expected Delivery Date
+    </label>
+    <input
+        type="date"
+        id="delivery_date_{{ order['order_id'] }}"
+        name="expected_delivery_date"
+        value="{{ order['expected_delivery_date'] or '' }}"
+        min="{{ order['expected_delivery_date'] or '' }}"
+    >
+
+    <label for="start_time_{{ order['order_id'] }}">
+        Delivery Starts
+    </label>
+    <input
+        type="time"
+        id="start_time_{{ order['order_id'] }}"
+        name="delivery_start_time"
+        value="{{ order['delivery_start_time'] or '' }}"
+    >
+
+    <label for="end_time_{{ order['order_id'] }}">
+        Delivery Ends
+    </label>
+    <input
+        type="time"
+        id="end_time_{{ order['order_id'] }}"
+        name="delivery_end_time"
+        value="{{ order['delivery_end_time'] or '' }}"
+    >
+
+    <label for="delivery_status_{{ order['order_id'] }}">
+        Delivery Status
+    </label>
+    <select
+        id="delivery_status_{{ order['order_id'] }}"
+        name="delivery_status"
+        required
+    >
+        {% for status in [
+            'Pending',
+            'Scheduled',
+            'Out for Delivery',
+            'Delivered'
+        ] %}
+            <option
+                value="{{ status }}"
+                {% if order['delivery_status'] == status %}
+                    selected
+                {% endif %}
+            >
+                {{ status }}
+            </option>
+        {% endfor %}
+    </select>
+
+    <button type="submit">Save Delivery Update</button>
+</form>
                                 method="POST"
                                 action="{{ url_for(
                                     'update_order_status',
@@ -69,13 +183,8 @@
                                     id="status-{{ order['order_id'] }}"
                                     name="status"
                                     required>
-                                    {% for status in [
-                                        'Pending',
-                                        'Confirmed',
-                                        'Shipped',
-                                        'Completed',
-                                        'Cancelled'
-                                    ] %}
+                                    {% for status in [ 'Pending', 'Confirmed', 'Shipped', 'Completed',
+                                        'Cancelled' ] %}
                                         <option
                                             value="{{ status }}"
                                             {% if order['status'] == status %}

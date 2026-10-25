@@ -60,6 +60,54 @@
                         <p>
                             Quantity: {{ order['quantity'] }}
                         </p>
+                        <p>
+                            Delivery Status: {{ order['delivery_status'] }}
+                        </p>
+                        {% if order['delivery_status'] == 'Delivered' %}
+    {% if not order['review_id'] %}
+        <div class="seller-review">
+            <h3>Rate Your Seller</h3>
+            <p>How was your experience with this seller?</p>
+
+            <form
+                method="POST"
+                action="{{ url_for('review_seller', order_id=order['id']) }}"
+            >
+                <label for="rating_{{ order['id'] }}">
+                    Your Rating
+                </label>
+
+                <select
+                    id="rating_{{ order['id'] }}"
+                    name="rating"
+                    required
+                >
+                    <option value="">Choose a rating</option>
+                    <option value="5">★★★★★ - Excellent</option>
+                    <option value="4">★★★★ - Very good</option>
+                    <option value="3">★★★ - Good</option>
+                    <option value="2">★★ - Fair</option>
+                    <option value="1">★ - Poor</option>
+                </select>
+
+                <label for="comment_{{ order['id'] }}">
+                    Written Review (optional)
+                </label>
+
+                <textarea
+                    id="comment_{{ order['id'] }}"
+                    name="comment"
+                    maxlength="1000"
+                    placeholder="Share your experience..."
+                ></textarea>
+
+                <button type="submit">Submit Review</button>
+            </form>
+        </div>
+    {% else %}
+        <p>⭐ You have already reviewed this order.</p>
+    {% endif %}
+{% endif %}
 
                         <p>
                             Total:
@@ -67,6 +115,10 @@
                                 GH₵ {{ "%.2f"|format(order['total_price']) }}
                             </strong>
                         </p>
+                        <p>
+    <strong>Payment:</strong>
+    {{ order['payment_status'] }}
+</p>
 
                         <p>
                             Date: {{ order['created_at'] }}

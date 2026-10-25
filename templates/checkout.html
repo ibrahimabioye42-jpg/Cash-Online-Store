@@ -33,14 +33,58 @@
                   action="{{ url_for('checkout', product_id=product.id) }}">
 
                 <label for="quantity">Quantity:</label>
-                <input
-                    type="number"
-                    id="quantity"
-                    name="quantity"
-                    min="1"
-                    max="{{ product.quantity }}"
-                    value="1"
-                    required>
+                <input type="number" id="quantity" name="quantity"
+                    min="1" max="{{ product.quantity }}" value="1" required>
+                    <div class="delivery-details">
+    <h3>Delivery Information</h3>
+
+    <label for="delivery_region">Region</label>
+    <select id="delivery_region" name="delivery_region" required>
+        <option value="">Select your region</option>
+        <option value="Volta">Volta Region</option>
+        <option value="Greater Accra">Greater Accra Region</option>
+        <option value="Ashanti">Ashanti Region</option>
+        <option value="Eastern">Eastern Region</option>
+        <option value="Central">Central Region</option>
+        <option value="Western">Western Region</option>
+        <option value="Western North">Western North Region</option>
+        <option value="Oti">Oti Region</option>
+        <option value="Bono">Bono Region</option>
+        <option value="Bono East">Bono East Region</option>
+        <option value="Ahafo">Ahafo Region</option>
+        <option value="Northern">Northern Region</option>
+        <option value="Savannah">Savannah Region</option>
+        <option value="North East">North East Region</option>
+        <option value="Upper East">Upper East Region</option>
+        <option value="Upper West">Upper West Region</option>
+    </select>
+
+    <label for="delivery_town">Town or City</label>
+    <input
+        type="text"
+        id="delivery_town"
+        name="delivery_town"
+        placeholder="e.g. Ho"
+        required
+    >
+
+    <label for="delivery_address">Full Delivery Address</label>
+    <textarea
+        id="delivery_address"
+        name="delivery_address"
+        placeholder="Enter your house number, street or landmark"
+        required
+    ></textarea>
+
+    <label for="delivery_phone">Contact Number</label>
+    <input
+        type="tel"
+        id="delivery_phone"
+        name="delivery_phone"
+        placeholder="e.g. 0241234567"
+        required
+    >
+</div>
 
                 <button type="submit">Place Order</button>
             </form>
