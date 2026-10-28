@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Seller Profile | Cash Online Store</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+
+    <style>
+        .profile-form {
+            max-width: 600px;
+            margin: 35px auto;
+            padding: 25px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+        }
+
+        .profile-form label {
+            display: block;
+            margin-top: 18px;
+            margin-bottom: 7px;
+            font-weight: bold;
+        }
+
+        .profile-form input,
+        .profile-form textarea {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 7px;
+        }
+
+        .profile-form textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .current-picture {
+            width: 110px;
+            height: 110px;
+            object-fit: cover;
+            border-radius: 50%;
+            display: block;
+            margin: 12px 0;
+        }
+
+        .save-button {
+            margin-top: 22px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 7px;
+            background: #087f5b;
+            color: white;
+            cursor: pointer;
+        }
+
+        .message {
+            margin: 12px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <main class="profile-form">
+        <a href="{{ url_for('seller_dashboard') }}">
+            ← Back to seller dashboard
+        </a>
+
+        <h1>Edit Your Shop Profile</h1>
+        <p>Update the information buyers see when they visit your shop.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <p class="message">{{ message }}</p>
+            {% endfor %}
+        {% endwith %}
+
+        <form method="POST"
+              enctype="multipart/form-data">
+
+            <label for="shop_name">Shop name</label>
+            <input
+                type="text"
+                id="shop_name"
+                name="shop_name"
+                maxlength="100"
+                value="{{ seller['name'] }}"
+                required
+            >
+
+            <label for="shop_description">Shop description</label>
+            <textarea
+                id="shop_description"
+                name="shop_description"
+                maxlength="1000"
+                placeholder="Tell buyers about your shop and products..."
+            >{{ seller['shop_description'] or '' }}</textarea>
+
+            <label>Current profile picture</label>
+
+            {% if seller['profile_image'] %}
+                <img
+                    class="current-picture"
+                    src="{{ url_for('static', filename=seller['profile_image']) }}"
+                    alt="Current seller profile picture"
+                >
+            {% else %}
+                <p>No profile picture uploaded yet.</p>
+            {% endif %}
+
+            <label for="profile_image">Upload a new profile picture</label>
+            <input
+                type="file"
+                id="profile_image"
+                name="profile_image"
+                accept=".png,.jpg,.jpeg,.webp"
+            >
+
+            <button type="submit" class="save-button">
+                Save Profile
+            </button>
+        </form>
+    </main>
+</body>
+</html>

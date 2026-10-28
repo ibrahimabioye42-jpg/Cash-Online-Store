@@ -14,6 +14,7 @@ from werkzeug.security import (
 )
 import uuid
 from werkzeug.utils import secure_filename
+from flask import flash
 
 import os
 import requests
@@ -184,10 +185,37 @@ def init_db():
             FOREIGN KEY (buyer_id) REFERENCES users(id),
             FOREIGN KEY (seller_id) REFERENCES users(id)
         )
-    """)            
+    """) 
+    # Add seller profile fields without deleting existing data
+    connection = get_db_connection()
+
+    try:
+        user_columns = [
+            row["name"]
+            for row in connection.execute(
+                "PRAGMA table_info(users)"
+            ).fetchall()
+        ]
+
+        if "profile_image" not in user_columns:
+            connection.execute("""
+                ALTER TABLE users
+                ADD COLUMN profile_image TEXT
+            """)
+
+        if "shop_description" not in user_columns:
+            connection.execute("""
+                ALTER TABLE users
+                ADD COLUMN shop_description TEXT
+            """)
+
+        connection.commit()
+
+    finally:
+        connection.close()
+           
         
-    connection.commit() 
-    connection.close() 
+  
     
 
 def safe_next_url(target):
@@ -208,52 +236,80 @@ def safe_next_url(target):
 
 @app.route("/")
 def home():
+    # Get search and category values from the homepage
     search = request.args.get("q", "").strip()
     category = request.args.get("category", "").strip()
 
-    query = """
-        SELECT
-            p.*,
-            u.name AS seller_name
-        FROM products p
-        JOIN users u ON u.id = p.seller_id
-        WHERE u.role = 'seller'
-    """
-    parameters = []
-
-    if search:
-        query += """
-            AND (
-                p.name LIKE ?
-                OR p.category LIKE ?
-                OR p.description LIKE ?
-                OR u.name LIKE ?
-            )
-        """
-        term = f"%{search}%"
-        parameters.extend([term, term, term, term])
-
-    if category:
-        query += " AND p.category = ?"
-        parameters.append(category)
-
-    query += " ORDER BY p.created_at DESC, p.id DESC"
-
+    # Create the database connection BEFORE using it
     connection = get_db_connection()
+
     try:
+        # Main query: get products, seller names, and seller ratings
+        query = """
+            SELECT
+                p.*,
+                u.name AS seller_name,
+
+                (
+                    SELECT AVG(sr.rating)
+                    FROM seller_reviews AS sr
+                    WHERE sr.seller_id = p.seller_id
+                ) AS seller_average_rating,
+
+                (
+                    SELECT COUNT(sr.id)
+                    FROM seller_reviews AS sr
+                    WHERE sr.seller_id = p.seller_id
+                ) AS seller_review_count
+
+            FROM products AS p
+            JOIN users AS u ON u.id = p.seller_id
+            WHERE u.role = 'seller'
+              
+        """
+
+        parameters = []
+
+        # Filter products by the search text
+        if search:
+            query += """
+                AND (
+                    p.name LIKE ?
+                    OR p.category LIKE ?
+                    OR p.description LIKE ?
+                    OR u.name LIKE ?
+                )
+            """
+
+            term = f"%{search}%"
+            parameters.extend([term, term, term, term])
+
+        # Filter products by category
+        if category:
+            query += " AND p.category = ?"
+            parameters.append(category)
+
+        # Show the newest products first
+        query += " ORDER BY p.created_at DESC, p.id DESC"
+
+        # Run the product query
         products = connection.execute(
             query, parameters
         ).fetchall()
 
+        # Get categories for the category dropdown
         categories = connection.execute("""
             SELECT DISTINCT category
             FROM products
             WHERE quantity > 0
             ORDER BY category
         """).fetchall()
+
     finally:
+        # Always close the database connection
         connection.close()
 
+    # Send the results to the homepage
     return render_template(
         "index.html",
         products=products,
@@ -261,7 +317,6 @@ def home():
         search=search,
         selected_category=category
     )
-
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -425,6 +480,124 @@ def seller_dashboard():
         stats=stats,
         products=products
     )
+@app.route("/edit-seller-profile", methods=["GET", "POST"])
+def edit_seller_profile():
+    # Only logged-in sellers can edit their profiles
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user_role") != "seller":
+        flash("Only sellers can edit seller profiles.", "error")
+        return redirect(url_for("home"))
+
+    connection = get_db_connection()
+
+    try:
+        seller = connection.execute("""
+            SELECT id, name, profile_image, shop_description
+            FROM users
+            WHERE id = ? AND role = 'seller'
+        """, (session["user_id"],)).fetchone()
+
+        if seller is None:
+            flash("Seller account not found.", "error")
+            return redirect(url_for("home"))
+
+        if request.method == "POST":
+            shop_name = request.form.get("shop_name", "").strip()
+            shop_description = request.form.get(
+                "shop_description", ""
+            ).strip()
+
+            if not shop_name:
+                flash("Shop name cannot be empty.", "error")
+                return render_template(
+                    "edit_seller_profile.html",
+                    seller=seller
+                )
+
+            if len(shop_name) > 100:
+                flash("Shop name must be 100 characters or less.", "error")
+                return render_template(
+                    "edit_seller_profile.html",
+                    seller=seller
+                )
+
+            if len(shop_description) > 1000:
+                flash("Description must be 1000 characters or less.", "error")
+                return render_template(
+                    "edit_seller_profile.html",
+                    seller=seller
+                )
+
+            # Keep the current image unless a new one is uploaded
+            profile_image = seller["profile_image"]
+
+            image = request.files.get("profile_image")
+
+            if image and image.filename:
+                allowed_extensions = {"png", "jpg", "jpeg", "webp"}
+                filename = secure_filename(image.filename)
+                extension = filename.rsplit(".", 1)[-1].lower()
+
+                if "." not in filename or extension not in allowed_extensions:
+                    flash(
+                        "Upload a PNG, JPG, JPEG, or WEBP image.",
+                        "error"
+                    )
+                    return render_template(
+                        "edit_seller_profile.html",
+                        seller=seller
+                    )
+
+                # Create the uploads folder if it does not exist
+                upload_folder = os.path.join(
+                    app.root_path, "static", "uploads"
+                )
+                os.makedirs(upload_folder, exist_ok=True)
+
+                # Give the image a unique filename
+                image_filename = f"seller_{session['user_id']}_{uuid.uuid4().hex}.{extension}"
+
+                image_path = os.path.join(
+                    upload_folder, image_filename
+                )
+                image.save(image_path)
+
+                # Save a web path, not the computer's full path
+                profile_image = f"uploads/{image_filename}"
+
+            connection.execute("""
+                UPDATE users
+                SET name = ?,
+                    shop_description = ?,
+                    profile_image = ?
+                WHERE id = ? AND role = 'seller'
+            """, (
+                shop_name,
+                shop_description,
+                profile_image,
+                session["user_id"]
+            ))
+
+            connection.commit()
+
+            # Keep the displayed session name up to date
+            session["user_name"] = shop_name
+
+            flash("Your seller profile was updated successfully!", "success")
+            return redirect(url_for(
+                "seller_profile",
+                seller_id=session["user_id"]
+            ))
+
+        return render_template(
+            "edit_seller_profile.html",
+            seller=seller
+        )
+
+    finally:
+        connection.close()
 
 @app.route("/seller/orders")
 def seller_orders():
@@ -903,31 +1076,64 @@ def product_detail(product_id):
 @app.route("/seller/<int:seller_id>")
 def seller_profile(seller_id):
     connection = get_db_connection()
+
     try:
+        # Get the public details of this seller
         seller = connection.execute("""
-            SELECT id, name, created_at
+            SELECT
+                id,
+                name,
+                profile_image,
+                shop_description,
+                created_at
             FROM users
-            WHERE id = ? AND role = 'seller'
+            WHERE id = ?
+              AND role = 'seller'
         """, (seller_id,)).fetchone()
 
+        # Show an error page if the seller does not exist
         if seller is None:
             abort(404)
 
+        # Get this seller's products and rating information
         products = connection.execute("""
-            SELECT *
-            FROM products
-            WHERE seller_id = ? AND quantity > 0
-            ORDER BY created_at DESC, id DESC
+            SELECT
+                p.*,
+                (
+                    SELECT AVG(sr.rating)
+                    FROM seller_reviews AS sr
+                    WHERE sr.seller_id = p.seller_id
+                ) AS seller_average_rating,
+                (
+                    SELECT COUNT(sr.id)
+                    FROM seller_reviews AS sr
+                    WHERE sr.seller_id = p.seller_id
+                ) AS seller_review_count
+            FROM products AS p
+            WHERE p.seller_id = ?
+              AND p.quantity > 0
+            ORDER BY p.created_at DESC, p.id DESC
         """, (seller_id,)).fetchall()
+
+        # Calculate the seller's overall rating
+        rating = connection.execute("""
+            SELECT
+                AVG(rating) AS average_rating,
+                COUNT(*) AS review_count
+            FROM seller_reviews
+            WHERE seller_id = ?
+        """, (seller_id,)).fetchone()
+
     finally:
         connection.close()
 
     return render_template(
         "seller_profile.html",
         seller=seller,
-        products=products
+        products=products,
+        average_rating=rating["average_rating"],
+        review_count=rating["review_count"]
     )
-
 
 @app.route("/buy/<int:product_id>")
 def buy_product(product_id):

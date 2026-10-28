@@ -4,118 +4,204 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ seller['name'] }} | Cash Online Store</title>
-    <meta name="description"
-          content="Explore products sold by {{ seller['name'] }} on Cash Online Store.">
     <link rel="stylesheet"
-          href="{{ url_for('static', filename='style.css') }}">
+          href="{{ url_for('static', filename='css/style.css') }}">
+
+    <style>
+        .seller-profile {
+            max-width: 1100px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        .seller-header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 24px;
+            background: #f5f7fa;
+            border-radius: 14px;
+            margin-bottom: 30px;
+        }
+
+        .seller-avatar {
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #ddd;
+        }
+
+        .seller-info h1 {
+            margin: 0 0 10px;
+        }
+
+        .seller-description {
+            margin: 10px 0;
+            color: #555;
+        }
+
+        .seller-rating {
+            margin-top: 10px;
+        }
+
+        .rating-stars {
+            color: #e6a500;
+            letter-spacing: 2px;
+        }
+
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+        }
+
+        .product-card {
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 12px;
+            background: white;
+        }
+
+        .product-card img {
+            width: 100%;
+            height: 190px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
+        .product-card h3 {
+            margin-bottom: 8px;
+        }
+
+        .product-card a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .product-price {
+            font-weight: bold;
+            margin: 8px 0;
+        }
+
+        @media (max-width: 600px) {
+            .seller-header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+        }
+    </style>
 </head>
+
 <body>
-<header class="navbar">
-    <a class="logo" href="{{ url_for('home') }}">
-        <span class="logo-icon">N</span>
-        Cash Online Store
-    </a>
-    <nav class="nav-links">
-        <a href="{{ url_for('home') }}">Home</a>
-        {% if session.get('user_id') %}
-            <span>Welcome, {{ session.get('user_name') }}!</span>
-            {% if session.get('user_role') == 'seller' %}
-                <a href="{{ url_for('seller_dashboard') }}">
-                    Seller Dashboard
-                </a>
+    <main class="seller-profile">
+
+        <p>
+            <a href="{{ url_for('home') }}">← Back to homepage</a>
+        </p>
+
+        <section class="seller-header">
+            {% if seller['profile_image'] %}
+               <img
+    class="seller-avatar"
+    src="{{ url_for('static', filename=seller['profile_image']) }}"
+    alt="{{ seller['name'] }} profile picture"
+>
+            {% else %}
+                <img
+    class="seller-avatar"
+    src="{{ url_for('static', filename='images/default-profile.png') }}"
+    alt="{{ seller['name'] }} profile picture"
+>
             {% endif %}
-            <form method="POST" action="{{ url_for('logout') }}">
-                <button type="submit">Logout</button>
-            </form>
-        {% else %}
-            <a href="{{ url_for('login') }}">Login</a>
-            <a href="{{ url_for('register') }}">Sign Up</a>
-        {% endif %}
-    </nav>
-</header>
-<main class="section">
-    <!-- SELLER INFORMATION -->
-    <section class="seller-banner">
-        <div>
-            <span class="eyebrow">SELLER PROFILE</span>
-            <h1>{{ seller['name'] }}</h1>
-            <p>
-                Selling on Cash Online Store since
-                {{ seller['created_at'][:10] if seller['created_at'] else 'recently' }}.
-            </p>
-            <p>
-                {{ products|length }} available product(s)
-            </p>
-        </div>
-    </section>
-    <!-- SELLER PRODUCTS -->
-    <section class="section">
-        <div class="section-heading">
-            <div>
-                <span class="eyebrow">SHOP THIS SELLER</span>
-                <h2>Products by {{ seller['name'] }}</h2>
+
+            <div class="seller-info">
+                <h1>{{ seller['name'] }}</h1>
+
+                <p class="seller-description">
+                    {{ seller['shop_description'] or
+                       'Welcome to my shop on Cash Online Store!' }}
+                </p>
+
+                <div class="seller-rating">
+                    {% if review_count > 0 %}
+                        <span class="rating-stars">
+                            {% for star in range(1, 6) %}
+                                {% if star <=
+                                    (average_rating | round(0, 'floor') | int) %}
+                                    ★
+                                {% else %}
+                                    ☆
+                                {% endif %}
+                            {% endfor %}
+                        </span>
+
+                        <strong>
+                            {{ "%.1f"|format(average_rating) }}/5
+                        </strong>
+
+                        <span>({{ review_count }} reviews)</span>
+                    {% else %}
+                        <span>No ratings yet</span>
+                    {% endif %}
+                </div>
             </div>
-        </div>
+        </section>
+
+        <h2>Products from {{ seller['name'] }}</h2>
+
         {% if products %}
-            <div class="product-grid">
+            <section class="product-grid">
                 {% for product in products %}
                     <article class="product-card">
-                        <a class="product-image"
-                           href="{{ url_for('product_detail', product_id=product['id']) }}">
+
+                        <a href="{{ url_for(
+                            'product_detail',
+                            product_id=product['id']
+                        ) }}">
                             {% if product['image'] %}
                                 <img
                                     src="{{ product['image'] }}"
                                     alt="{{ product['name'] }}"
-                                    loading="lazy">
+                                >
                             {% else %}
-                                <span>No image available</span>
+                                <img
+                                    src="{{ url_for(
+                                        'static',
+                                        filename='images/default-product.png'
+                                    ) }}"
+                                    alt="No product image available"
+                                >
                             {% endif %}
+
+                            <h3>{{ product['name'] }}</h3>
                         </a>
-                        <div class="product-info">
-                            <span class="product-category">
-                                {{ product['category'] }}
-                            </span>
-                            <h3>
-                                <a href="{{ url_for('product_detail', product_id=product['id']) }}">
-                                    {{ product['name'] }}
-                                </a>
-                            </h3>
-                            <p class="product-description">
-                                {{ product['description'] or 'No description provided.' }}
-                            </p>
-                            <div class="product-bottom">
-                                <strong class="price">
-                                    GH₵ {{ "%.2f"|format(product['price']) }}
-                                </strong>
-                                <a class="add-button"
-                                   href="{{ url_for('buy_product', product_id=product['id']) }}">
-                                    Buy Now
-                                </a>
-                            </div>
-                        </div>
+
+                        <p>{{ product['category'] }}</p>
+
+                        <p class="product-price">
+                            GH₵ {{ "%.2f"|format(product['price']) }}
+                        </p>
+
+                        <p>
+                            {{ product['seller_review_count'] }}
+                            seller reviews
+                        </p>
+
+                        <a href="{{ url_for(
+                            'product_detail',
+                            product_id=product['id']
+                        ) }}">
+                            View product
+                        </a>
+
                     </article>
                 {% endfor %}
-            </div>
+            </section>
         {% else %}
-            <div class="empty-state">
-                <h3>No available products</h3>
-                <p>This seller has not listed any available products yet.</p>
-            </div>
+            <p>This seller has no available products at the moment.</p>
         {% endif %}
-        <p>
-            <a class="secondary-button" href="{{ url_for('home') }}">
-                ← Back to Marketplace
-            </a>
-        </p>
-    </section>
-</main>
-<footer class="footer">
-    <a class="logo footer-logo" href="{{ url_for('home') }}">
-        <span class="logo-icon">N</span>
-        Cash Online Store
-    </a>
-    <p>Buy. Sell. Grow.</p>
-    <p>&copy; 2026 Cash Online Store. All rights reserved.</p>
-</footer>
+
+    </main>
 </body>
 </html>

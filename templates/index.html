@@ -190,13 +190,38 @@
                             <p class="product-description">
                                 {{ product['description'] or 'No description provided.' }}
                             </p>
-                            <p class="muted">
-                                Sold by
-                                <a href="{{ url_for('seller_profile', seller_id=product['seller_id']) }}">
-                                    {{ product['seller_name'] }}
-                                </a>
-                            </p>
-                            <!-- PRICE AND STOCK -->
+                           <p>
+    Seller:
+    <a href="{{ url_for(
+        'seller_profile',
+        seller_id=product['seller_id']
+    ) }}">
+        {{ product['seller_name'] }}
+    </a>
+</p>
+                          <div class="seller-rating">
+    {% if product['seller_review_count'] and product['seller_review_count'] > 0 %}
+        <span class="rating-stars">
+            {% for star in range(1, 6) %}
+                {% if star <= (product['seller_average_rating'] | round(0, 'floor') | int) %}
+                    ★
+                {% else %}
+                    ☆
+                {% endif %}
+            {% endfor %}
+        </span>
+
+        <span>
+            {{ "%.1f"|format(product['seller_average_rating']) }}/5
+        </span>
+
+        <small>
+            ({{ product['seller_review_count'] }} reviews)
+        </small>
+    {% else %}
+        <span>No ratings yet</span>
+    {% endif %}
+</div>                    <!-- PRICE AND STOCK -->
                             <div class="product-bottom">
                                 <strong class="price">
                                     GH₵ {{ "%.2f"|format(product['price']) }}

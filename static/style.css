@@ -1251,3 +1251,20 @@ input:focus-visible {
     border-radius: 6px;
     cursor: pointer;
 }
+.seller-rating {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+.rating-stars {
+    color: #e6a500;
+    letter-spacing: 1px;
+}
+
+.seller-rating small {
+    color: #666;
+}
