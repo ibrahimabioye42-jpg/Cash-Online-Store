@@ -23,9 +23,18 @@
         <a class="primary-button" href="{{ url_for('add_product') }}">
     Add Product
 </a>
+<a href="{{ url_for('seller_profile', seller_id=session['user_id']) }}">
+    View My Public Shop
+</a>
+
 <a href="{{ url_for('edit_seller_profile') }}">
     Edit Shop Profile
 </a>
+
+<a href="{{ url_for('seller_analytics') }}">
+    View Seller Analytics
+</a>
+
 <section class="dashboard-stats">
     <div class="stat-card">
         <h3>Total Orders</h3>

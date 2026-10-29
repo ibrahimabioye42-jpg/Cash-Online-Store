@@ -100,25 +100,34 @@
                 placeholder="Tell buyers about your shop and products..."
             >{{ seller['shop_description'] or '' }}</textarea>
 
-            <label>Current profile picture</label>
-
-            {% if seller['profile_image'] %}
-                <img
-                    class="current-picture"
-                    src="{{ url_for('static', filename=seller['profile_image']) }}"
-                    alt="Current seller profile picture"
-                >
-            {% else %}
-                <p>No profile picture uploaded yet.</p>
-            {% endif %}
-
+           
             <label for="profile_image">Upload a new profile picture</label>
             <input
-                type="file"
-                id="profile_image"
-                name="profile_image"
-                accept=".png,.jpg,.jpeg,.webp"
-            >
+    type="file"
+    id="profile_image"
+    name="profile_image"
+    accept="image/png,image/jpeg,image/webp"
+>
+
+<img
+    id="image-preview"
+    class="current-picture"
+    src="{% if seller['profile_image'] %}{{ url_for('static', filename=seller['profile_image']) }}{% else %}{{ url_for('static', filename='images/default-profile.png') }}{% endif %}"
+    alt="Profile picture preview"
+>
+
+<script>
+    const imageInput = document.getElementById("profile_image");
+    const imagePreview = document.getElementById("image-preview");
+
+    imageInput.addEventListener("change", function () {
+        const file = this.files[0];
+
+        if (file) {
+            imagePreview.src = URL.createObjectURL(file);
+        }
+    });
+</script>
 
             <button type="submit" class="save-button">
                 Save Profile

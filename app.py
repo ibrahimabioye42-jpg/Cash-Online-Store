@@ -480,6 +480,119 @@ def seller_dashboard():
         stats=stats,
         products=products
     )
+@app.route("/seller-analytics")
+def seller_analytics():
+    # Only logged-in sellers can view their analytics
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user_role") != "seller":
+        flash("Only sellers can view seller analytics.", "error")
+        return redirect(url_for("home"))
+
+    seller_id = session["user_id"]
+    connection = get_db_connection()
+
+    try:
+        # 1. Product and stock statistics
+        inventory = connection.execute("""
+            SELECT
+                COUNT(*) AS total_products,
+                COALESCE(SUM(quantity), 0) AS total_stock,
+                COALESCE(SUM(
+                    CASE WHEN quantity > 0 AND quantity <= 5
+                         THEN 1 ELSE 0 END
+                ), 0) AS low_stock_products,
+                COALESCE(SUM(
+                    CASE WHEN quantity = 0
+                         THEN 1 ELSE 0 END
+                ), 0) AS out_of_stock_products
+            FROM products
+            WHERE seller_id = ?
+        """, (seller_id,)).fetchone()
+
+        # 2. Order statistics for this seller
+        sales = connection.execute("""
+            SELECT
+                COUNT(o.id) AS total_orders,
+                COALESCE(SUM(
+                    CASE WHEN LOWER(o.payment_status) = 'paid'
+                         THEN o.total_price ELSE 0 END
+                ), 0) AS paid_sales,
+                COALESCE(SUM(
+                    CASE WHEN LOWER(o.payment_status) = 'paid'
+                         THEN 1 ELSE 0 END
+                ), 0) AS paid_orders
+            FROM orders AS o
+            JOIN products AS p ON p.id = o.product_id
+            WHERE p.seller_id = ?
+        """, (seller_id,)).fetchone()
+
+        # 3. Customer rating statistics
+        ratings = connection.execute("""
+            SELECT
+                AVG(rating) AS average_rating,
+                COUNT(*) AS review_count
+            FROM seller_reviews
+            WHERE seller_id = ?
+        """, (seller_id,)).fetchone()
+
+        # 4. Recent orders
+        recent_orders = connection.execute("""
+            SELECT
+                o.id AS order_id,
+                o.quantity,
+                o.total_price,
+                o.payment_status,
+                o.created_at,
+                p.name AS product_name
+            FROM orders AS o
+            JOIN products AS p ON p.id = o.product_id
+            WHERE p.seller_id = ?
+            ORDER BY o.created_at DESC, o.id DESC
+            LIMIT 5
+        """, (seller_id,)).fetchall()
+        monthly_sales = [
+    dict(row) for row in connection.execute("""
+        SELECT
+            strftime('%Y-%m', o.created_at) AS sales_month,
+            COALESCE(SUM(
+                CASE
+                    WHEN LOWER(o.payment_status) = 'paid'
+                    THEN o.total_price
+                    ELSE 0
+                END
+            ), 0) AS revenue,
+            COALESCE(SUM(
+                CASE
+                    WHEN LOWER(o.payment_status) = 'paid'
+                    THEN 1
+                    ELSE 0
+                END
+            ), 0) AS paid_orders
+        FROM orders AS o
+        JOIN products AS p ON p.id = o.product_id
+        WHERE p.seller_id = ?
+          AND o.created_at >= date(
+              'now', '-11 months', 'start of month'
+          )
+        GROUP BY strftime('%Y-%m', o.created_at)
+        ORDER BY sales_month
+    """, (seller_id,)).fetchall()
+]
+        
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "seller_analytics.html",
+        inventory=inventory,
+        sales=sales,
+        ratings=ratings,
+        recent_orders=recent_orders,
+        monthly_sales=monthly_sales
+    )
 @app.route("/edit-seller-profile", methods=["GET", "POST"])
 def edit_seller_profile():
     # Only logged-in sellers can edit their profiles
@@ -1123,6 +1236,19 @@ def seller_profile(seller_id):
             FROM seller_reviews
             WHERE seller_id = ?
         """, (seller_id,)).fetchone()
+        # Get customer reviews for this seller
+        reviews = connection.execute("""
+            SELECT
+                sr.rating,
+                sr.comment,
+                sr.created_at,
+                buyer.name AS buyer_name
+            FROM seller_reviews AS sr
+            JOIN users AS buyer
+                ON buyer.id = sr.buyer_id
+            WHERE sr.seller_id = ?
+            ORDER BY sr.created_at DESC, sr.id DESC
+        """, (seller_id,)).fetchall()
 
     finally:
         connection.close()
@@ -1132,7 +1258,8 @@ def seller_profile(seller_id):
         seller=seller,
         products=products,
         average_rating=rating["average_rating"],
-        review_count=rating["review_count"]
+        review_count=rating["review_count"],
+        reviews=reviews
     )
 
 @app.route("/buy/<int:product_id>")

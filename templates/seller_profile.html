@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ seller['name'] }} | Cash Online Store</title>
     <link rel="stylesheet"
-          href="{{ url_for('static', filename='css/style.css') }}">
+          href="{{ url_for('static', filename='style.css') }}">
 
     <style>
         .seller-profile {
@@ -147,6 +147,37 @@
                 </div>
             </div>
         </section>
+        <section class="customer-reviews">
+    <h2>Customer Reviews</h2>
+
+    {% if reviews %}
+        {% for review in reviews %}
+            <article class="review-card">
+                <h3>{{ review['buyer_name'] }}</h3>
+
+                <p class="rating-stars">
+                    {% for star in range(1, 6) %}
+                        {% if star <= review['rating'] %}
+                            ★
+                        {% else %}
+                            ☆
+                        {% endif %}
+                    {% endfor %}
+                </p>
+
+                {% if review['comment'] %}
+                    <p>{{ review['comment'] }}</p>
+                {% else %}
+                    <p>This buyer left a rating without a comment.</p>
+                {% endif %}
+
+                <small>{{ review['created_at'] }}</small>
+            </article>
+        {% endfor %}
+    {% else %}
+        <p>This seller has not received any customer reviews yet.</p>
+    {% endif %}
+</section>
 
         <h2>Products from {{ seller['name'] }}</h2>
 
