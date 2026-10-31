@@ -3,92 +3,303 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Checkout | Cash Online Store</title>
+
     <link rel="stylesheet"
           href="{{ url_for('static', filename='style.css') }}">
 </head>
+
 <body>
-    <header>
-        <h1>Cash Online Store</h1>
-        <a href="{{ url_for('home') }}">Continue Shopping</a>
-    </header>
 
-    <main class="container">
-        <h2>Checkout</h2>
-
-        <div class="product-card">
-            {% if product.image %}
-                <img src="{{ product.image }}"
-                     alt="{{ product.name }}"
-                     style="max-width: 250px;">
-            {% endif %}
-
-            <h3>{{ product.name }}</h3>
-            <p>Category: {{ product.category }}</p>
-            <p>Seller: {{ product.seller_name }}</p>
-            <p>Price per item: GH₵ {{ "%.2f"|format(product.price) }}</p>
-            <p>Available quantity: {{ product.quantity }}</p>
-
-            <form method="POST"
-                  action="{{ url_for('checkout', product_id=product.id) }}">
-
-                <label for="quantity">Quantity:</label>
-                <input type="number" id="quantity" name="quantity"
-                    min="1" max="{{ product.quantity }}" value="1" required>
-                    <div class="delivery-details">
-    <h3>Delivery Information</h3>
-
-    <label for="delivery_region">Region</label>
-    <select id="delivery_region" name="delivery_region" required>
-        <option value="">Select your region</option>
-        <option value="Volta">Volta Region</option>
-        <option value="Greater Accra">Greater Accra Region</option>
-        <option value="Ashanti">Ashanti Region</option>
-        <option value="Eastern">Eastern Region</option>
-        <option value="Central">Central Region</option>
-        <option value="Western">Western Region</option>
-        <option value="Western North">Western North Region</option>
-        <option value="Oti">Oti Region</option>
-        <option value="Bono">Bono Region</option>
-        <option value="Bono East">Bono East Region</option>
-        <option value="Ahafo">Ahafo Region</option>
-        <option value="Northern">Northern Region</option>
-        <option value="Savannah">Savannah Region</option>
-        <option value="North East">North East Region</option>
-        <option value="Upper East">Upper East Region</option>
-        <option value="Upper West">Upper West Region</option>
-    </select>
-
-    <label for="delivery_town">Town or City</label>
-    <input
-        type="text"
-        id="delivery_town"
-        name="delivery_town"
-        placeholder="e.g. Ho"
-        required
-    >
-
-    <label for="delivery_address">Full Delivery Address</label>
-    <textarea
-        id="delivery_address"
-        name="delivery_address"
-        placeholder="Enter your house number, street or landmark"
-        required
-    ></textarea>
-
-    <label for="delivery_phone">Contact Number</label>
-    <input
-        type="tel"
-        id="delivery_phone"
-        name="delivery_phone"
-        placeholder="e.g. 0241234567"
-        required
-    >
+<div class="announcement-bar">
+    Complete your order securely with Cash Online Store.
 </div>
 
-                <button type="submit">Place Order</button>
+<header class="marketplace-navbar">
+
+    <a class="market-logo" href="{{ url_for('home') }}">
+        <span class="market-logo-icon">C</span>
+        <span>Cash Online Store</span>
+    </a>
+
+    <nav class="market-nav-links">
+        <a href="{{ url_for('home') }}">Continue Shopping</a>
+    </nav>
+
+</header>
+
+
+<main class="checkout-page">
+
+    <div class="checkout-heading">
+        <span class="checkout-label">YOUR PURCHASE</span>
+        <h1>Checkout</h1>
+        <p>Review your product and provide your delivery information.</p>
+    </div>
+
+
+    <div class="checkout-layout">
+
+        <!-- Order Summary -->
+        <section class="checkout-order-card">
+
+            <h2>Order Summary</h2>
+
+            <div class="checkout-product">
+
+                {% if product.image %}
+
+                    <img
+                        src="{{ product.image }}"
+                        alt="{{ product.name }}"
+                        class="checkout-product-image"
+                    >
+
+                {% else %}
+
+                    <div class="checkout-no-image">
+                        📦
+                    </div>
+
+                {% endif %}
+
+                <div class="checkout-product-info">
+
+                    <h3>{{ product.name }}</h3>
+
+                    <p>{{ product.category }}</p>
+
+                    <p class="checkout-seller">
+                        Sold by: {{ product.seller_name }}
+                    </p>
+
+                    <strong>
+                        GH₵ {{ "%.2f"|format(product.price) }}
+                    </strong>
+
+                </div>
+
+            </div>
+
+            <div class="checkout-stock">
+                <span>Available stock</span>
+                <strong>{{ product.quantity }} items</strong>
+            </div>
+
+            <div class="checkout-total-box">
+
+                <div class="checkout-total-row">
+                    <span>Price per item</span>
+                    <strong>
+                        GH₵ {{ "%.2f"|format(product.price) }}
+                    </strong>
+                </div>
+
+                <div class="checkout-total-row">
+                    <span>Quantity</span>
+                    <strong id="summary-quantity">1</strong>
+                </div>
+
+                <div class="checkout-total-row checkout-grand-total">
+                    <span>Subtotal</span>
+                    <strong id="checkout-subtotal">
+                        GH₵ {{ "%.2f"|format(product.price) }}
+                    </strong>
+                </div>
+
+                <p class="checkout-total-note">
+                    Delivery charges, if applicable, will be handled
+                    according to your existing order process.
+                </p>
+
+            </div>
+
+        </section>
+
+
+        <!-- Checkout Form -->
+        <section class="checkout-form-card">
+
+            <h2>Delivery Information</h2>
+
+            <p class="checkout-form-intro">
+                Enter the details where you want your order delivered.
+            </p>
+
+            <form
+                method="POST"
+                action="{{ url_for('checkout', product_id=product.id) }}"
+            >
+
+                <div class="checkout-form-section">
+
+                    <h3>1. Select Quantity</h3>
+
+                    <label for="quantity">Product Quantity</label>
+
+                    <input
+                        type="number"
+                        id="quantity"
+                        name="quantity"
+                        min="1"
+                        max="{{ product.quantity }}"
+                        value="1"
+                        required
+                    >
+
+                    <small>
+                        Maximum available: {{ product.quantity }}
+                    </small>
+
+                </div>
+
+
+                <div class="checkout-form-section">
+
+                    <h3>2. Delivery Location</h3>
+
+                    <label for="delivery_region">Region</label>
+
+                    <select
+                        id="delivery_region"
+                        name="delivery_region"
+                        required
+                    >
+                        <option value="">Select your region</option>
+                        <option value="Volta">Volta Region</option>
+                        <option value="Greater Accra">Greater Accra Region</option>
+                        <option value="Ashanti">Ashanti Region</option>
+                        <option value="Eastern">Eastern Region</option>
+                        <option value="Central">Central Region</option>
+                        <option value="Western">Western Region</option>
+                        <option value="Western North">Western North Region</option>
+                        <option value="Oti">Oti Region</option>
+                        <option value="Bono">Bono Region</option>
+                        <option value="Bono East">Bono East Region</option>
+                        <option value="Ahafo">Ahafo Region</option>
+                        <option value="Northern">Northern Region</option>
+                        <option value="Savannah">Savannah Region</option>
+                        <option value="North East">North East Region</option>
+                        <option value="Upper East">Upper East Region</option>
+                        <option value="Upper West">Upper West Region</option>
+                    </select>
+
+
+                    <label for="delivery_town">Town or City</label>
+
+                    <input
+                        type="text"
+                        id="delivery_town"
+                        name="delivery_town"
+                        placeholder="e.g. Ho"
+                        required
+                    >
+
+
+                    <label for="delivery_address">
+                        Full Delivery Address
+                    </label>
+
+                    <textarea
+                        id="delivery_address"
+                        name="delivery_address"
+                        rows="4"
+                        placeholder="House number, street name or nearby landmark"
+                        required
+                    ></textarea>
+
+                </div>
+
+
+                <div class="checkout-form-section">
+
+                    <h3>3. Contact Information</h3>
+
+                    <label for="delivery_phone">
+                        Contact Number
+                    </label>
+
+                    <input
+                        type="tel"
+                        id="delivery_phone"
+                        name="delivery_phone"
+                        placeholder="e.g. 0241234567"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="checkout-secure-note">
+                    🔒 Your delivery information will be used to process
+                    your order.
+                </div>
+
+
+                <button type="submit" class="checkout-submit-button">
+                    Place Order →
+                </button>
+
+                <a href="{{ url_for('home') }}"
+                   class="checkout-cancel-link">
+                    Continue Shopping
+                </a>
+
             </form>
-        </div>
-    </main>
+
+        </section>
+
+    </div>
+
+</main>
+
+
+<footer class="market-footer">
+
+    <a class="market-logo" href="{{ url_for('home') }}">
+        <span class="market-logo-icon">C</span>
+        <span>Cash Online Store</span>
+    </a>
+
+    <p>Buy. Sell. Grow.</p>
+
+    <p>&copy; 2026 Cash Online Store. All rights reserved.</p>
+
+</footer>
+
+
+<script>
+    const quantityInput = document.getElementById("quantity");
+
+    const quantityDisplay =
+        document.getElementById("summary-quantity");
+
+    const subtotalDisplay =
+        document.getElementById("checkout-subtotal");
+
+    const unitPrice = Number({{ product.price|tojson }});
+
+    function updateCheckoutTotal() {
+
+        let quantity = Number(quantityInput.value);
+
+        if (!Number.isFinite(quantity) || quantity < 1) {
+            quantity = 1;
+        }
+
+        quantityDisplay.textContent = quantity;
+
+        const subtotal = unitPrice * quantity;
+
+        subtotalDisplay.textContent =
+            "GH₵ " + subtotal.toFixed(2);
+    }
+
+    quantityInput.addEventListener("input", updateCheckoutTotal);
+
+    updateCheckoutTotal();
+</script>
+
 </body>
 </html>

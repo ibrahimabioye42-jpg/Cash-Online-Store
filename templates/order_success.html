@@ -3,16 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Order Confirmation | Cash Online Store</title>
+
     <link rel="stylesheet"
           href="{{ url_for('static', filename='style.css') }}">
 </head>
+
 <body>
-    <main class="container">
+
+<div class="announcement-bar">
+    Thank you for shopping with Cash Online Store!
+</div>
+
+<header class="marketplace-navbar">
+
+    <a class="market-logo" href="{{ url_for('home') }}">
+        <span class="market-logo-icon">C</span>
+        <span>Cash Online Store</span>
+    </a>
+
+    <nav class="market-nav-links">
+        <a href="{{ url_for('home') }}">Home</a>
+    </nav>
+
+</header>
+
+
+<main class="order-success-page">
+
+    <section class="order-success-card">
+
+        <div class="order-success-icon">
+            ✓
+        </div>
+
+        <span class="order-success-label">
+            ORDER CONFIRMATION
+        </span>
+
         <h1>Order Placed Successfully!</h1>
-        <p>Your order has been saved. Its current status is Pending.</p>
-        <p>No payment has been processed by this demo.</p>
-        <a href="{{ url_for('home') }}">Return to Homepage</a>
-    </main>
+
+        <p class="order-success-message">
+            Thank you for shopping with Cash Online Store.
+            Your order has been saved successfully.
+        </p>
+
+
+        <div class="order-pending-status">
+
+            <span class="pending-status-dot"></span>
+
+            <div>
+                <strong>Order Status: Pending</strong>
+                <p>Your order is awaiting further processing.</p>
+            </div>
+
+        </div>
+
+
+        <div class="order-success-information">
+
+            <h3>What's Next?</h3>
+
+            <div class="order-next-step">
+                <span>1</span>
+                <p>Your order has been recorded.</p>
+            </div>
+
+            <div class="order-next-step">
+                <span>2</span>
+                <p>The seller can review and process your order.</p>
+            </div>
+
+            <div class="order-next-step">
+                <span>3</span>
+                <p>You can check your order status from your account.</p>
+            </div>
+
+        </div>
+
+
+        <div class="order-success-actions">
+
+            <a href="{{ url_for('my_orders') }}"
+               class="order-view-button">
+                View My Orders
+            </a>
+
+            <a href="{{ url_for('home') }}"
+               class="order-shopping-button">
+                Continue Shopping
+            </a>
+
+        </div>
+
+
+        <p class="order-success-help">
+            Need help? Please contact the seller or use the available
+            support channels on Cash Online Store.
+        </p>
+
+    </section>
+
+</main>
+
+
+<footer class="market-footer">
+
+    <a class="market-logo" href="{{ url_for('home') }}">
+        <span class="market-logo-icon">C</span>
+        <span>Cash Online Store</span>
+    </a>
+
+    <p>Buy. Sell. Grow.</p>
+
+    <p>&copy; 2026 Cash Online Store. All rights reserved.</p>
+
+</footer>
+
 </body>
 </html>

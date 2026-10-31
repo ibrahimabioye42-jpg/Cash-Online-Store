@@ -3,236 +3,362 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>{{ seller['name'] }} | Cash Online Store</title>
+
+    <meta name="description"
+          content="Explore {{ seller['name'] }}'s shop on Cash Online Store.">
+
     <link rel="stylesheet"
           href="{{ url_for('static', filename='style.css') }}">
-
-    <style>
-        .seller-profile {
-            max-width: 1100px;
-            margin: 30px auto;
-            padding: 20px;
-        }
-
-        .seller-header {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            padding: 24px;
-            background: #f5f7fa;
-            border-radius: 14px;
-            margin-bottom: 30px;
-        }
-
-        .seller-avatar {
-            width: 110px;
-            height: 110px;
-            border-radius: 50%;
-            object-fit: cover;
-            background: #ddd;
-        }
-
-        .seller-info h1 {
-            margin: 0 0 10px;
-        }
-
-        .seller-description {
-            margin: 10px 0;
-            color: #555;
-        }
-
-        .seller-rating {
-            margin-top: 10px;
-        }
-
-        .rating-stars {
-            color: #e6a500;
-            letter-spacing: 2px;
-        }
-
-        .product-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 20px;
-        }
-
-        .product-card {
-            padding: 15px;
-            border: 1px solid #eee;
-            border-radius: 12px;
-            background: white;
-        }
-
-        .product-card img {
-            width: 100%;
-            height: 190px;
-            object-fit: cover;
-            border-radius: 8px;
-        }
-
-        .product-card h3 {
-            margin-bottom: 8px;
-        }
-
-        .product-card a {
-            color: inherit;
-            text-decoration: none;
-        }
-
-        .product-price {
-            font-weight: bold;
-            margin: 8px 0;
-        }
-
-        @media (max-width: 600px) {
-            .seller-header {
-                align-items: flex-start;
-                flex-direction: column;
-            }
-        }
-    </style>
 </head>
 
 <body>
-    <main class="seller-profile">
 
-        <p>
-            <a href="{{ url_for('home') }}">← Back to homepage</a>
-        </p>
+<div class="announcement-bar">
+    Discover great products on Cash Online Store — Buy. Sell. Grow.
+</div>
 
-        <section class="seller-header">
-            {% if seller['profile_image'] %}
-               <img
-    class="seller-avatar"
-    src="{{ url_for('static', filename=seller['profile_image']) }}"
-    alt="{{ seller['name'] }} profile picture"
->
-            {% else %}
-                <img
-    class="seller-avatar"
-    src="{{ url_for('static', filename='images/default-profile.png') }}"
-    alt="{{ seller['name'] }} profile picture"
->
+<header class="marketplace-navbar">
+
+    <a class="market-logo" href="{{ url_for('home') }}">
+        <span class="market-logo-icon">C</span>
+        <span>Cash Online Store</span>
+    </a>
+
+    <nav class="market-nav-links">
+        <a href="{{ url_for('home') }}">Home</a>
+
+        {% if session.get('user_id') %}
+
+            <span class="market-welcome">
+                Welcome, {{ session.get('user_name') }}!
+            </span>
+
+            {% if session.get('user_role') == 'seller' %}
+                <a href="{{ url_for('seller_dashboard') }}">Dashboard</a>
             {% endif %}
 
-            <div class="seller-info">
-                <h1>{{ seller['name'] }}</h1>
+            <form method="POST" action="{{ url_for('logout') }}">
+                <button type="submit" class="nav-logout">Logout</button>
+            </form>
 
-                <p class="seller-description">
-                    {{ seller['shop_description'] or
-                       'Welcome to my shop on Cash Online Store!' }}
-                </p>
+        {% else %}
+            <a href="{{ url_for('login') }}">Login</a>
+            <a href="{{ url_for('register') }}" class="nav-join">Join Free</a>
+        {% endif %}
+    </nav>
 
-                <div class="seller-rating">
-                    {% if review_count > 0 %}
-                        <span class="rating-stars">
+</header>
+
+
+<main class="public-shop-page">
+
+    <div class="shop-breadcrumb">
+        <a href="{{ url_for('home') }}">Home</a>
+        <span>/</span>
+        <strong>{{ seller['name'] }}'s Shop</strong>
+    </div>
+
+
+    <!-- Seller Profile Header -->
+    <section class="public-seller-header">
+
+        <div class="public-seller-avatar">
+
+            {% if seller['profile_image'] %}
+                <img
+                    src="{{ url_for('static', filename=seller['profile_image']) }}"
+                    alt="{{ seller['name'] }} profile picture"
+                >
+            {% else %}
+                <div class="public-seller-initial">
+                    {{ seller['name'][0]|upper }}
+                </div>
+            {% endif %}
+
+        </div>
+
+        <div class="public-seller-info">
+
+            <span class="public-shop-label">SELLER SHOP</span>
+
+            <h1>{{ seller['name'] }}</h1>
+
+            <p class="public-seller-description">
+                {{ seller['shop_description'] or
+                   'Welcome to my shop on Cash Online Store!' }}
+            </p>
+
+            <div class="public-seller-rating">
+
+                {% if review_count > 0 %}
+
+                    <span class="public-rating-stars">
+                        {% for star in range(1, 6) %}
+                            {% if star <=
+                                (average_rating | round(0, 'floor') | int) %}
+                                ★
+                            {% else %}
+                                ☆
+                            {% endif %}
+                        {% endfor %}
+                    </span>
+
+                    <strong>
+                        {{ "%.1f"|format(average_rating) }}/5
+                    </strong>
+
+                    <span>
+                        ({{ review_count }} customer reviews)
+                    </span>
+
+                {% else %}
+                    <span>No customer ratings yet</span>
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- Shop Statistics -->
+    <section class="public-shop-stats">
+
+        <div class="public-shop-stat">
+            <strong>{{ products|length }}</strong>
+            <span>Listed Products</span>
+        </div>
+
+        <div class="public-shop-stat">
+            <strong>
+                {% if review_count > 0 %}
+                    {{ "%.1f"|format(average_rating) }}/5
+                {% else %}
+                    New
+                {% endif %}
+            </strong>
+            <span>Seller Rating</span>
+        </div>
+
+        <div class="public-shop-stat">
+            <strong>{{ review_count }}</strong>
+            <span>Customer Reviews</span>
+        </div>
+
+    </section>
+
+
+    <!-- Seller Products -->
+    <section class="public-shop-products">
+
+        <div class="public-section-heading">
+            <div>
+                <span class="public-section-label">EXPLORE THE SHOP</span>
+                <h2>Products from {{ seller['name'] }}</h2>
+                <p>Browse products listed by this seller.</p>
+            </div>
+
+            <a href="{{ url_for('home') }}" class="shop-back-link">
+                ← All Products
+            </a>
+        </div>
+
+
+        {% if products %}
+
+            <div class="public-shop-product-grid">
+
+                {% for product in products %}
+
+                    <article class="public-shop-product-card">
+
+                        <a
+                            class="public-shop-product-image"
+                            href="{{ url_for('product_detail', product_id=product['id']) }}"
+                        >
+
+                            {% if product['image'] %}
+                                <img
+                                    src="{{ product['image'] }}"
+                                    alt="{{ product['name'] }}"
+                                    loading="lazy"
+                                >
+                            {% else %}
+                                <div class="public-product-placeholder">
+                                    <span>📦</span>
+                                    <small>No image available</small>
+                                </div>
+                            {% endif %}
+
+                            {% if product['quantity'] > 0 %}
+                                <span class="public-product-status in-stock">
+                                    In Stock
+                                </span>
+                            {% else %}
+                                <span class="public-product-status out-stock">
+                                    Sold Out
+                                </span>
+                            {% endif %}
+
+                        </a>
+
+
+                        <div class="public-shop-product-info">
+
+                            <span class="public-product-category">
+                                {{ product['category'] }}
+                            </span>
+
+                            <h3>
+                                <a href="{{ url_for('product_detail', product_id=product['id']) }}">
+                                    {{ product['name'] }}
+                                </a>
+                            </h3>
+
+                            <div class="public-product-price">
+                                GH₵ {{ "%.2f"|format(product['price']) }}
+                            </div>
+
+                            <p class="public-product-stock">
+                                {% if product['quantity'] > 0 %}
+                                    {{ product['quantity'] }} available
+                                {% else %}
+                                    Currently unavailable
+                                {% endif %}
+                            </p>
+
+                            <div class="public-product-actions">
+
+                                <a
+                                    href="{{ url_for('product_detail', product_id=product['id']) }}"
+                                    class="public-view-product"
+                                >
+                                    View Details
+                                </a>
+
+                                {% if product['quantity'] > 0 %}
+                                    <a
+                                        href="{{ url_for('buy_product', product_id=product['id']) }}"
+                                        class="public-buy-product"
+                                    >
+                                        Buy Now
+                                    </a>
+                                {% else %}
+                                    <button
+                                        class="public-buy-product disabled"
+                                        disabled
+                                    >
+                                        Sold Out
+                                    </button>
+                                {% endif %}
+
+                            </div>
+
+                        </div>
+
+                    </article>
+
+                {% endfor %}
+
+            </div>
+
+        {% else %}
+
+            <div class="public-shop-empty">
+                <span>🛍️</span>
+                <h3>No products available yet</h3>
+                <p>This seller has not listed any products at the moment.</p>
+                <a href="{{ url_for('home') }}">Explore other products</a>
+            </div>
+
+        {% endif %}
+
+    </section>
+
+
+    <!-- Customer Reviews -->
+    <section class="public-customer-reviews">
+
+        <div class="public-section-heading">
+            <div>
+                <span class="public-section-label">BUYER FEEDBACK</span>
+                <h2>Customer Reviews</h2>
+                <p>See what customers say about this seller.</p>
+            </div>
+        </div>
+
+
+        {% if reviews %}
+
+            <div class="public-review-grid">
+
+                {% for review in reviews %}
+
+                    <article class="public-review-card">
+
+                        <div class="public-review-top">
+                            <div class="public-review-avatar">
+                                {{ review['buyer_name'][0]|upper }}
+                            </div>
+
+                            <div>
+                                <h3>{{ review['buyer_name'] }}</h3>
+                                <small>{{ review['created_at'] }}</small>
+                            </div>
+                        </div>
+
+
+                        <div class="public-review-stars">
                             {% for star in range(1, 6) %}
-                                {% if star <=
-                                    (average_rating | round(0, 'floor') | int) %}
+                                {% if star <= review['rating'] %}
                                     ★
                                 {% else %}
                                     ☆
                                 {% endif %}
                             {% endfor %}
-                        </span>
+                        </div>
 
-                        <strong>
-                            {{ "%.1f"|format(average_rating) }}/5
-                        </strong>
 
-                        <span>({{ review_count }} reviews)</span>
-                    {% else %}
-                        <span>No ratings yet</span>
-                    {% endif %}
-                </div>
-            </div>
-        </section>
-        <section class="customer-reviews">
-    <h2>Customer Reviews</h2>
-
-    {% if reviews %}
-        {% for review in reviews %}
-            <article class="review-card">
-                <h3>{{ review['buyer_name'] }}</h3>
-
-                <p class="rating-stars">
-                    {% for star in range(1, 6) %}
-                        {% if star <= review['rating'] %}
-                            ★
-                        {% else %}
-                            ☆
-                        {% endif %}
-                    {% endfor %}
-                </p>
-
-                {% if review['comment'] %}
-                    <p>{{ review['comment'] }}</p>
-                {% else %}
-                    <p>This buyer left a rating without a comment.</p>
-                {% endif %}
-
-                <small>{{ review['created_at'] }}</small>
-            </article>
-        {% endfor %}
-    {% else %}
-        <p>This seller has not received any customer reviews yet.</p>
-    {% endif %}
-</section>
-
-        <h2>Products from {{ seller['name'] }}</h2>
-
-        {% if products %}
-            <section class="product-grid">
-                {% for product in products %}
-                    <article class="product-card">
-
-                        <a href="{{ url_for(
-                            'product_detail',
-                            product_id=product['id']
-                        ) }}">
-                            {% if product['image'] %}
-                                <img
-                                    src="{{ product['image'] }}"
-                                    alt="{{ product['name'] }}"
-                                >
-                            {% else %}
-                                <img
-                                    src="{{ url_for(
-                                        'static',
-                                        filename='images/default-product.png'
-                                    ) }}"
-                                    alt="No product image available"
-                                >
-                            {% endif %}
-
-                            <h3>{{ product['name'] }}</h3>
-                        </a>
-
-                        <p>{{ product['category'] }}</p>
-
-                        <p class="product-price">
-                            GH₵ {{ "%.2f"|format(product['price']) }}
+                        <p class="public-review-comment">
+                            {{ review['comment'] or
+                               'This buyer left a rating without a comment.' }}
                         </p>
-
-                        <p>
-                            {{ product['seller_review_count'] }}
-                            seller reviews
-                        </p>
-
-                        <a href="{{ url_for(
-                            'product_detail',
-                            product_id=product['id']
-                        ) }}">
-                            View product
-                        </a>
 
                     </article>
+
                 {% endfor %}
-            </section>
+
+            </div>
+
         {% else %}
-            <p>This seller has no available products at the moment.</p>
+
+            <div class="public-no-reviews">
+                <span>⭐</span>
+                <p>This seller has not received customer reviews yet.</p>
+            </div>
+
         {% endif %}
 
-    </main>
+    </section>
+
+</main>
+
+
+<footer class="market-footer">
+
+    <a class="market-logo" href="{{ url_for('home') }}">
+        <span class="market-logo-icon">C</span>
+        <span>Cash Online Store</span>
+    </a>
+
+    <p>Buy. Sell. Grow.</p>
+
+    <p>&copy; 2026 Cash Online Store. All rights reserved.</p>
+
+</footer>
+
 </body>
 </html>
