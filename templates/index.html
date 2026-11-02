@@ -76,63 +76,156 @@
 
 <main>
 
-    <!-- HERO -->
-    <section class="market-hero">
-        <div class="market-hero-content">
-            <span class="hero-pill">
-                YOUR ONLINE MARKETPLACE
-            </span>
+  <!-- CASH ONLINE STORE HERO SLIDER -->
+<section class="market-hero-slider">
 
-            <h1>
-                Great finds.<br>
-                <span>Better shopping.</span>
-            </h1>
+    <div class="hero-slides">
 
-            <p>
-                Explore products from independent sellers, discover
-                something new, and shop all in one place.
-            </p>
+        <!-- FIRST IMAGE -->
+        <div class="hero-slide active">
 
-            <div class="hero-actions">
-                <a class="primary-button" href="#products">
-                    Explore Products →
-                </a>
-                <a class="hero-outline-button" href="#sell">
-                    Start Selling
-                </a>
+            <img
+                src="{{ url_for('static', filename='images/hero-shoes.jpeg') }}"
+                alt="Discover fashionable shoes"
+                class="hero-slide-image">
+
+            <div class="hero-slide-overlay">
+
+                <span class="hero-pill">
+                    YOUR ONLINE MARKETPLACE
+                </span>
+
+                <h1>
+                    Great finds.<br>
+                    <span>Better shopping.</span>
+                </h1>
+
+                <p>
+                    Explore products from independent sellers,
+                    discover something new, and shop all in one place.
+                </p>
+
+                <div class="hero-actions">
+
+                    <a class="primary-button" href="#products">
+                        Explore Products →
+                    </a>
+
+                    <a class="hero-outline-button" href="#sell">
+                        Start Selling
+                    </a>
+
+                </div>
+
             </div>
 
-            <div class="hero-trust">
-                <span>✓ Multiple sellers</span>
-                <span>✓ Easy ordering</span>
-                <span>✓ Local marketplace</span>
-            </div>
         </div>
 
-        <div class="market-hero-art" aria-hidden="true">
-            <div class="hero-decoration hero-decoration-one"></div>
-            <div class="hero-decoration hero-decoration-two"></div>
 
-            <div class="hero-shopping-card">
-                <span class="shopping-card-label">YOUR NEXT FIND</span>
-                <div class="shopping-bag">🛍️</div>
-                <h3>Discover something great.</h3>
-                <p>Shop products you love.</p>
-                <div class="shopping-card-footer">
-                    <span>Cash Online Store</span>
-                    <span>★ ★ ★ ★ ★</span>
+        <!-- SECOND IMAGE -->
+        <div class="hero-slide">
+
+            <img
+                src="{{ url_for('static', filename='images/safe-shopping.jpeg') }}"
+                alt="Shopping safely online"
+                class="hero-slide-image">
+
+            <div class="hero-slide-overlay">
+
+                <span class="hero-pill">
+                    SHOP WITH CONFIDENCE
+                </span>
+
+                <h1>
+                    Buy safely<br>
+                    <span>from your sellers.</span>
+                </h1>
+
+                <p>
+                    Discover products, connect with sellers,
+                    and enjoy convenient shopping on Cash Online Store.
+                </p>
+
+                <div class="hero-actions">
+
+                    <a class="primary-button" href="#products">
+                        Start Shopping →
+                    </a>
+
+                    <a class="hero-outline-button" href="#sell">
+                        Become a Seller
+                    </a>
+
                 </div>
+
             </div>
 
-            <div class="hero-floating-label">
-                <span>✨</span>
-                <div>
-                    <strong>Something for everyone</strong>
-                    <small>Explore the marketplace</small>
-                </div>
-            </div>
         </div>
-    </section>
+
+    </div>
+
+
+    <!-- PREVIOUS BUTTON -->
+    <button class="hero-slider-arrow hero-prev"
+            onclick="changeHeroSlide(-1)"
+            aria-label="Previous slide">
+        &#10094;
+    </button>
+
+
+    <!-- NEXT BUTTON -->
+    <button class="hero-slider-arrow hero-next"
+            onclick="changeHeroSlide(1)"
+            aria-label="Next slide">
+        &#10095;
+    </button>
+
+
+    <!-- SLIDE INDICATORS -->
+    <div class="hero-slider-dots">
+
+        <button class="hero-dot active"
+                onclick="showHeroSlide(0)"
+                aria-label="Slide 1"></button>
+
+        <button class="hero-dot"
+                onclick="showHeroSlide(1)"
+                aria-label="Slide 2"></button>
+
+    </div>
+
+</section>
+
+
+<!-- HERO SLIDER JAVASCRIPT -->
+<script>
+
+    let currentHeroSlide = 0;
+
+    const heroSlides = document.querySelectorAll(".hero-slide");
+    const heroDots = document.querySelectorAll(".hero-dot");
+
+    function showHeroSlide(index) {
+
+        heroSlides[currentHeroSlide].classList.remove("active");
+        heroDots[currentHeroSlide].classList.remove("active");
+
+        currentHeroSlide =
+            (index + heroSlides.length) % heroSlides.length;
+
+        heroSlides[currentHeroSlide].classList.add("active");
+        heroDots[currentHeroSlide].classList.add("active");
+    }
+
+    function changeHeroSlide(direction) {
+        showHeroSlide(currentHeroSlide + direction);
+    }
+
+    setInterval(function () {
+        changeHeroSlide(1);
+    }, 5000);
+
+</script>
 
     <!-- BENEFITS -->
     <section class="market-benefits">
@@ -408,4 +501,5 @@
 </footer>
 
 </body>
+
 </html>

@@ -3800,3 +3800,167 @@ input:focus-visible {
         padding: 14px;
     }
 }
+
+/* =====================================
+   CASH ONLINE STORE HERO SLIDER
+===================================== */
+
+.market-hero-slider {
+    position: relative;
+    display: block;
+    width: calc(100% - 40px);
+    max-width: 1250px;
+    height: 380px;
+    margin: 25px auto;
+    padding: 0;
+    overflow: hidden;
+    border-radius: 16px;
+    background: #111827;
+    isolation: isolate;
+}
+
+.market-hero-slider .hero-slides {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.market-hero-slider .hero-slide {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(100%);
+    transition: transform 0.8s ease, opacity 0.8s ease;
+}
+
+.market-hero-slider .hero-slide.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+    z-index: 2;
+}
+
+.market-hero-slider .hero-slide-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.market-hero-slider .hero-slide-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 40px;
+    color: white;
+    background: linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 0.80),
+        rgba(0, 0, 0, 0.35) 65%,
+        transparent
+    );
+}
+
+.market-hero-slider .hero-slide-overlay h1 {
+    max-width: 600px;
+    font-size: clamp(30px, 4vw, 48px);
+    line-height: 1.1;
+    margin: 15px 0;
+    color: white;
+}
+
+.market-hero-slider .hero-slide-overlay h1 span {
+    color: #93c5fd;
+}
+
+.market-hero-slider .hero-slide-overlay p {
+    max-width: 420px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #f3f4f6;
+}
+
+.market-hero-slider .hero-slide-overlay .hero-actions {
+    margin-top: 15px;
+}
+
+.market-hero-slider .hero-slider-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 5;
+    width: 38px;
+    height: 38px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    color: #111827;
+    cursor: pointer;
+}
+
+.market-hero-slider .hero-prev {
+    left: 15px;
+}
+
+.market-hero-slider .hero-next {
+    right: 15px;
+}
+
+.market-hero-slider .hero-slider-dots {
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    display: flex;
+    gap: 9px;
+}
+
+.market-hero-slider .hero-dot {
+    width: 10px;
+    height: 10px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+}
+
+.market-hero-slider .hero-dot.active {
+    background: white;
+}
+
+
+/* MOBILE RESPONSIVENESS */
+
+@media (max-width: 768px) {
+
+    .market-hero-slider {
+        width: calc(100% - 24px);
+        height: 330px;
+        margin: 18px auto;
+    }
+
+    .market-hero-slider .hero-slide-overlay {
+        padding: 25px;
+        background: rgba(0, 0, 0, 0.55);
+    }
+
+    .market-hero-slider .hero-slide-overlay h1 {
+        font-size: 30px;
+    }
+
+    .market-hero-slider .hero-slide-overlay p {
+        font-size: 12px;
+    }
+
+}
