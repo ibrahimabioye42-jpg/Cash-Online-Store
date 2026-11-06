@@ -1,6 +1,5 @@
-from itertools import product
-from multiprocessing import connection
 
+from functools import wraps
 from flask import (
     Flask, render_template, request,
     redirect, url_for, session, abort
@@ -54,6 +53,32 @@ def get_db_connection():
     connection = sqlite3.connect(DATABASE)
     connection.row_factory = sqlite3.Row
     return connection
+
+def admin_required(view_function):
+    @wraps(view_function)
+    def wrapper(*args, **kwargs):
+
+        if "user_id" not in session:
+            return redirect(url_for("login"))
+
+        connection = get_db_connection()
+
+        try:
+            admin = connection.execute("""
+                SELECT user_id
+                FROM admin_users
+                WHERE user_id = ?
+            """, (session["user_id"],)).fetchone()
+
+        finally:
+            connection.close()
+
+        if admin is None:
+            abort(403)
+
+        return view_function(*args, **kwargs)
+
+    return wrapper
 
 
 def init_db():
@@ -208,6 +233,13 @@ def init_db():
                 ALTER TABLE users
                 ADD COLUMN shop_description TEXT
             """)
+            connection.execute("""
+    CREATE TABLE IF NOT EXISTS admin_users (
+        user_id INTEGER PRIMARY KEY,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+""")
 
         connection.commit()
 
@@ -370,6 +402,7 @@ def register():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = None
+
     next_url = safe_next_url(
         request.args.get("next") or request.form.get("next")
     )
@@ -379,6 +412,7 @@ def login():
         password = request.form.get("password", "")
 
         connection = get_db_connection()
+
         try:
             user = connection.execute(
                 "SELECT * FROM users WHERE email = ?",
@@ -390,21 +424,41 @@ def login():
         if user and check_password_hash(
             user["password_hash"], password
         ):
-            # Do not let a seller use buyer-only purchase routes.
+
+            # Clear any previous login session
             session.clear()
+
+            # Store the user's information
             session["user_id"] = user["id"]
             session["user_name"] = user["name"]
             session["user_role"] = user["role"]
 
+            # Check whether this user is an administrator
+            connection = get_db_connection()
+
+            try:
+                admin = connection.execute("""
+                    SELECT user_id
+                    FROM admin_users
+                    WHERE user_id = ?
+                """, (user["id"],)).fetchone()
+
+            finally:
+                connection.close()
+
+            # Redirect administrator to admin dashboard
+            if admin:
+                return redirect(url_for("admin_dashboard"))
+
+            # Redirect seller to seller dashboard
             if user["role"] == "seller":
                 return redirect(url_for("seller_dashboard"))
 
-            if next_url:
-                return redirect(next_url)
+            # Redirect buyer to requested page or homepage
+            return redirect(next_url or url_for("home"))
 
-            return redirect(url_for("home"))
-
-        error = "Invalid email address or password."
+        else:
+            error = "Invalid email or password."
 
     return render_template(
         "login.html",
@@ -1697,6 +1751,65 @@ def verify_payment():
 
     finally:
         connection.close()
+
+@app.route("/admin")
+@admin_required
+def admin_dashboard():
+
+    connection = get_db_connection()
+
+    try:
+        stats = connection.execute("""
+            SELECT
+                (SELECT COUNT(*) FROM users) AS total_users,
+                (SELECT COUNT(*) FROM users
+                 WHERE role = 'buyer') AS total_buyers,
+                (SELECT COUNT(*) FROM users
+                 WHERE role = 'seller') AS total_sellers,
+                (SELECT COUNT(*) FROM products) AS total_products,
+                (SELECT COUNT(*) FROM orders) AS total_orders,
+                (SELECT COALESCE(SUM(total_price), 0)
+                 FROM orders) AS total_sales
+        """).fetchone()
+
+        users = connection.execute("""
+            SELECT id, name, email, role, created_at
+            FROM users
+            ORDER BY id DESC
+            LIMIT 50
+        """).fetchall()
+
+        products = connection.execute("""
+            SELECT p.id, p.name, p.price, p.quantity,
+                   u.name AS seller_name
+            FROM products p
+            JOIN users u ON u.id = p.seller_id
+            ORDER BY p.id DESC
+            LIMIT 50
+        """).fetchall()
+
+        orders = connection.execute("""
+            SELECT o.id, o.total_price, o.payment_status,
+                   o.status, o.created_at,
+                   buyer.name AS buyer_name,
+                   p.name AS product_name
+            FROM orders o
+            JOIN users buyer ON buyer.id = o.buyer_id
+            JOIN products p ON p.id = o.product_id
+            ORDER BY o.id DESC
+            LIMIT 50
+        """).fetchall()
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "admin_dashboard.html",
+        stats=stats,
+        users=users,
+        products=products,
+        orders=orders
+    )        
 
 
 

@@ -45,7 +45,7 @@
         <a href="{{ url_for('home') }}">Home</a>
         <a href="#categories">Categories</a>
         <a href="#products">Shop</a>
-        <a href="#sell">Sell</a>
+      
 
         {% if session.get('user_id') %}
             <span class="welcome-user">
@@ -439,26 +439,7 @@
         {% endif %}
     </section>
 
-    <!-- SELLER PROMOTION -->
-    <section class="market-seller-banner" id="sell">
-        <div class="seller-banner-icon">🏪</div>
-        <div class="market-seller-copy">
-            <span class="eyebrow">GROW YOUR BUSINESS</span>
-            <h2>Ready to put your products online?</h2>
-            <p>
-                Open your seller account, list your products, and reach
-                customers through Cash Online Store.
-            </p>
-            <p class="seller-plan-note">
-                Your account's current listing allowance and seller
-                plan rules still apply.
-            </p>
-        </div>
-        <a class="primary-button"
-           href="{{ url_for('register') }}">
-            Become a Seller →
-        </a>
-    </section>
+   
 
     <!-- ACCOUNT PROMOTION -->
     {% if not session.get('user_id') %}

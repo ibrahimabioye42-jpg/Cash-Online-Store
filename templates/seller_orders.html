@@ -104,13 +104,11 @@
                                 <strong>Current status:</strong>
                                 {{ order['status'] }}
                             </p>
-                            <form
 
-            <form
+    <form
     method="POST"
     action="{{ url_for('update_delivery', order_id=order['order_id']) }}"
-    class="delivery-update-form"
->
+    class="delivery-update-form">
     <h3>Update Delivery</h3>
 
     <label for="delivery_date_{{ order['order_id'] }}">

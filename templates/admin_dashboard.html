@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | Cash Online Store</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background: #f4f6fa;
+            color: #222;
+        }
+
+        .sidebar {
+            width: 240px;
+            height: 100vh;
+            background: #171c2c;
+            color: white;
+            position: fixed;
+            padding: 25px 18px;
+        }
+
+        .logo {
+            font-size: 23px;
+            font-weight: bold;
+            margin-bottom: 40px;
+        }
+
+        .logo span {
+            color: #f5a623;
+        }
+
+        .sidebar a {
+            display: block;
+            color: #ddd;
+            text-decoration: none;
+            padding: 14px 12px;
+            margin-bottom: 8px;
+            border-radius: 7px;
+        }
+
+        .sidebar a:hover,
+        .sidebar a.active {
+            background: #f5a623;
+            color: #171c2c;
+        }
+
+        .main {
+            margin-left: 240px;
+            padding: 30px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            gap: 15px;
+        }
+
+        .topbar h1 {
+            font-size: 26px;
+        }
+
+        .admin-label {
+            background: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            padding: 23px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .card p {
+            color: #777;
+            margin-bottom: 12px;
+        }
+
+        .card h2 {
+            font-size: 28px;
+            color: #171c2c;
+        }
+
+        .section {
+            background: white;
+            padding: 22px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            overflow-x: auto;
+        }
+
+        .section h2 {
+            margin-bottom: 18px;
+            font-size: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+        }
+
+        th, td {
+            padding: 13px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fc;
+            color: #555;
+        }
+
+        .role {
+            padding: 5px 10px;
+            border-radius: 15px;
+            background: #e8f0ff;
+            color: #2455a4;
+            font-size: 12px;
+        }
+
+        .empty {
+            color: #888;
+            padding: 15px 0;
+        }
+
+        @media (max-width: 900px) {
+            .cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+
+            .sidebar a {
+                display: inline-block;
+                margin-right: 5px;
+            }
+
+            .main {
+                margin-left: 0;
+                padding: 18px;
+            }
+
+            .cards {
+                grid-template-columns: 1fr;
+            }
+
+            .topbar {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <aside class="sidebar">
+        <div class="logo">CASH <span>STORE</span></div>
+
+        <a href="{{ url_for('admin_dashboard') }}" class="active">
+            Dashboard
+        </a>
+
+        <a href="#users">Manage Users</a>
+        <a href="#products">Manage Products</a>
+        <a href="#orders">Manage Orders</a>
+
+        <a href="{{ url_for('home') }}">Visit Store</a>
+
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </aside>
+
+    <main class="main">
+
+        <div class="topbar">
+            <div>
+                <h1>Admin Dashboard</h1>
+                <p>Welcome to Cash Online Store management.</p>
+            </div>
+
+            <div class="admin-label">
+                Administrator
+            </div>
+        </div>
+
+        <!-- STATISTICS -->
+
+        <div class="cards">
+
+            <div class="card">
+                <p>Total Users</p>
+                <h2>{{ stats.total_users }}</h2>
+            </div>
+
+            <div class="card">
+                <p>Total Buyers</p>
+                <h2>{{ stats.total_buyers }}</h2>
+            </div>
+
+            <div class="card">
+                <p>Total Sellers</p>
+                <h2>{{ stats.total_sellers }}</h2>
+            </div>
+
+            <div class="card">
+                <p>Total Products</p>
+                <h2>{{ stats.total_products }}</h2>
+            </div>
+
+            <div class="card">
+                <p>Total Orders</p>
+                <h2>{{ stats.total_orders }}</h2>
+            </div>
+
+            <div class="card">
+                <p>Total Order Value</p>
+                <h2>GH₵ {{ "%.2f"|format(stats.total_sales) }}</h2>
+            </div>
+
+        </div>
+
+        <!-- USERS -->
+
+        <div class="section" id="users">
+            <h2>Recent Users</h2>
+
+            {% if users %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Date Joined</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.id }}</td>
+                        <td>{{ user.name }}</td>
+                        <td>{{ user.email }}</td>
+                        <td>
+                            <span class="role">{{ user.role }}</span>
+                        </td>
+                        <td>{{ user.created_at }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+                <p class="empty">No users found.</p>
+            {% endif %}
+        </div>
+
+        <!-- PRODUCTS -->
+
+        <div class="section" id="products">
+            <h2>Recent Products</h2>
+
+            {% if products %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Product</th>
+                        <th>Price</th>
+                        <th>Quantity</th>
+                        <th>Seller</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for product in products %}
+                    <tr>
+                        <td>{{ product.id }}</td>
+                        <td>{{ product.name }}</td>
+                        <td>GH₵ {{ product.price }}</td>
+                        <td>{{ product.quantity }}</td>
+                        <td>{{ product.seller_name }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+                <p class="empty">No products found.</p>
+            {% endif %}
+        </div>
+
+        <!-- ORDERS -->
+
+        <div class="section" id="orders">
+            <h2>Recent Orders</h2>
+
+            {% if orders %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Buyer</th>
+                        <th>Product</th>
+                        <th>Amount</th>
+                        <th>Payment</th>
+                        <th>Order Status</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td>#{{ order.id }}</td>
+                        <td>{{ order.buyer_name }}</td>
+                        <td>{{ order.product_name }}</td>
+                        <td>GH₵ {{ order.total_price }}</td>
+                        <td>{{ order.payment_status }}</td>
+                        <td>{{ order.status }}</td>
+                        <td>{{ order.created_at }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+                <p class="empty">No orders found.</p>
+            {% endif %}
+        </div>
+
+    </main>
+
+</body>
+</html>
