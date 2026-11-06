@@ -1809,7 +1809,261 @@ def admin_dashboard():
         users=users,
         products=products,
         orders=orders
-    )        
+    ) 
+@app.route("/admin/users")
+@admin_required
+def admin_users():
+
+    search = request.args.get("q", "").strip()
+
+    connection = get_db_connection()
+
+    try:
+        if search:
+            users = connection.execute("""
+                SELECT id, name, email, role, created_at
+                FROM users
+                WHERE name LIKE ?
+                   OR email LIKE ?
+                   OR role LIKE ?
+                ORDER BY id DESC
+            """, (
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%"
+            )).fetchall()
+
+        else:
+            users = connection.execute("""
+                SELECT id, name, email, role, created_at
+                FROM users
+                ORDER BY id DESC
+            """).fetchall()
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "admin_users.html",
+        users=users,
+        search=search
+    )   
+@app.route("/admin/products")
+@admin_required
+def admin_products():
+
+    search = request.args.get("q", "").strip()
+
+    connection = get_db_connection()
+
+    try:
+        if search:
+            products = connection.execute("""
+                SELECT
+                    p.id,
+                    p.name,
+                    p.price,
+                    p.quantity,
+                    u.name AS seller_name,
+                    u.email AS seller_email
+                FROM products p
+                JOIN users u ON u.id = p.seller_id
+                WHERE p.name LIKE ?
+                   OR u.name LIKE ?
+                ORDER BY p.id DESC
+            """, (
+                f"%{search}%",
+                f"%{search}%"
+            )).fetchall()
+
+        else:
+            products = connection.execute("""
+                SELECT
+                    p.id,
+                    p.name,
+                    p.price,
+                    p.quantity,
+                    u.name AS seller_name,
+                    u.email AS seller_email
+                FROM products p
+                JOIN users u ON u.id = p.seller_id
+                ORDER BY p.id DESC
+            """).fetchall()
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "admin_products.html",
+        products=products,
+        search=search
+    )   
+@app.route("/admin/orders")
+@admin_required
+def admin_orders():
+
+    search = request.args.get("q", "").strip()
+
+    connection = get_db_connection()
+
+    try:
+        if search:
+            orders = connection.execute("""
+                SELECT
+                    o.id,
+                    o.quantity,
+                    o.total_price,
+                    o.payment_status,
+                    o.status AS order_status,
+                    o.created_at,
+                    buyer.name AS buyer_name,
+                    seller.name AS seller_name,
+                    p.name AS product_name
+
+                FROM orders o
+
+                JOIN users buyer
+                    ON buyer.id = o.buyer_id
+
+                JOIN products p
+                    ON p.id = o.product_id
+
+                JOIN users seller
+                    ON seller.id = p.seller_id
+
+                WHERE CAST(o.id AS TEXT) LIKE ?
+                   OR buyer.name LIKE ?
+                   OR seller.name LIKE ?
+                   OR p.name LIKE ?
+
+                ORDER BY o.id DESC
+            """, (
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%"
+            )).fetchall()
+
+        else:
+            orders = connection.execute("""
+                SELECT
+                    o.id,
+                    o.quantity,
+                    o.total_price,
+                    o.payment_status,
+                    o.status AS order_status,
+                    o.created_at,
+                    buyer.name AS buyer_name,
+                    seller.name AS seller_name,
+                    p.name AS product_name
+
+                FROM orders o
+
+                JOIN users buyer
+                    ON buyer.id = o.buyer_id
+
+                JOIN products p
+                    ON p.id = o.product_id
+
+                JOIN users seller
+                    ON seller.id = p.seller_id
+
+                ORDER BY o.id DESC
+            """).fetchall()
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "admin_orders.html",
+        orders=orders,
+        search=search
+    )
+@app.route("/admin/analytics")
+@admin_required
+def admin_analytics():
+
+    connection = get_db_connection()
+
+    try:
+        stats = connection.execute("""
+            SELECT
+                COALESCE(SUM(
+                    CASE
+                        WHEN LOWER(payment_status) = 'paid'
+                        THEN total_price
+                        ELSE 0
+                    END
+                ), 0) AS total_revenue,
+
+                COUNT(*) AS total_orders,
+
+                SUM(
+                    CASE
+                        WHEN LOWER(payment_status) = 'paid'
+                        THEN 1 ELSE 0
+                    END
+                ) AS paid_orders,
+
+                SUM(
+                    CASE
+                        WHEN LOWER(payment_status) != 'paid'
+                             OR payment_status IS NULL
+                        THEN 1 ELSE 0
+                    END
+                ) AS unpaid_orders
+
+            FROM orders
+        """).fetchone()
+
+        top_products = connection.execute("""
+            SELECT
+                p.name,
+                SUM(o.quantity) AS units_sold,
+                SUM(o.total_price) AS sales
+            FROM orders o
+            JOIN products p ON p.id = o.product_id
+            WHERE LOWER(o.payment_status) = 'paid'
+            GROUP BY p.id, p.name
+            ORDER BY units_sold DESC
+            LIMIT 10
+        """).fetchall()
+
+        top_sellers = connection.execute("""
+            SELECT
+                u.name AS seller_name,
+                COUNT(o.id) AS total_orders,
+                SUM(o.total_price) AS total_sales
+            FROM orders o
+            JOIN products p ON p.id = o.product_id
+            JOIN users u ON u.id = p.seller_id
+            WHERE LOWER(o.payment_status) = 'paid'
+            GROUP BY u.id, u.name
+            ORDER BY total_sales DESC
+            LIMIT 10
+        """).fetchall()
+
+        monthly_sales = connection.execute("""
+            SELECT
+                strftime('%Y-%m', created_at) AS month,
+                SUM(total_price) AS revenue
+            FROM orders
+            WHERE LOWER(payment_status) = 'paid'
+            GROUP BY strftime('%Y-%m', created_at)
+            ORDER BY month DESC
+            LIMIT 6
+        """).fetchall()
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "admin_analytics.html",
+        stats=stats,
+        top_products=top_products,
+        top_sellers=top_sellers,
+        monthly_sales=monthly_sales
+    ) 
 
 
 

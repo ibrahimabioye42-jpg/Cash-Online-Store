@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Manage Orders | Cash Online Store</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            background: #f4f6fa;
+            color: #222;
+        }
+
+        header {
+            background: #171c2c;
+            color: white;
+            padding: 22px 30px;
+        }
+
+        .container {
+            padding: 30px;
+        }
+
+        .back {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #2455a4;
+            text-decoration: none;
+        }
+
+        .panel {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            overflow-x: auto;
+        }
+
+        .search {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        input {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        button {
+            background: #f5a623;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            min-width: 1100px;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 13px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fc;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 15px;
+            background: #e8f0ff;
+            font-size: 12px;
+        }
+
+        .empty {
+            color: #777;
+            padding: 20px 0;
+        }
+
+        @media(max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+
+            .search {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h2>CASH STORE | Order Management</h2>
+</header>
+
+<div class="container">
+
+    <a href="{{ url_for('admin_dashboard') }}" class="back">
+        ← Back to Dashboard
+    </a>
+
+    <div class="panel">
+
+        <h2>Manage Orders</h2>
+        <p>Monitor customer purchases and delivery progress.</p>
+
+        <form method="GET" class="search">
+
+            <input
+                type="text"
+                name="q"
+                placeholder="Search order ID, buyer, seller or product..."
+                value="{{ search }}"
+            >
+
+            <button type="submit">Search</button>
+
+        </form>
+
+        <h3>Total Results: {{ orders|length }}</h3>
+
+        {% if orders %}
+
+        <table>
+
+            <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Buyer</th>
+                    <th>Product</th>
+                    <th>Seller</th>
+                    <th>Quantity</th>
+                    <th>Total</th>
+                    <th>Payment</th>
+                    <th>Order Status</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for order in orders %}
+
+                <tr>
+                    <td>#{{ order.id }}</td>
+                    <td>{{ order.buyer_name }}</td>
+                    <td>{{ order.product_name }}</td>
+                    <td>{{ order.seller_name }}</td>
+                    <td>{{ order.quantity }}</td>
+                    <td>
+                        GH₵ {{ "%.2f"|format(order.total_price) }}
+                    </td>
+                    <td>
+                        <span class="status">
+                            {{ order.payment_status or "Unknown" }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="status">
+                            {{ order.order_status or "Unknown" }}
+                        </span>
+                    </td>
+                    <td>{{ order.created_at }}</td>
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+        {% else %}
+
+        <p class="empty">No orders found.</p>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+</body>
+</html>

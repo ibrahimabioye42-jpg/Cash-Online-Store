@@ -183,17 +183,20 @@
     <aside class="sidebar">
         <div class="logo">CASH <span>STORE</span></div>
 
-        <a href="{{ url_for('admin_dashboard') }}" class="active">
-            Dashboard
-        </a>
+        <a href="{{ url_for('admin_dashboard') }}" class="active">  Dashboard</a>
 
-        <a href="#users">Manage Users</a>
-        <a href="#products">Manage Products</a>
-        <a href="#orders">Manage Orders</a>
+<a href="{{ url_for('admin_users') }}">Manage Users</a>
+
+        <a href="{{ url_for('admin_products') }}">Manage Products</a>
+
+        <a href="{{ url_for('admin_orders') }}">Manage Orders</a>
+
+        <a href="{{ url_for('admin_analytics') }}">Store Analytics</a>
 
         <a href="{{ url_for('home') }}">Visit Store</a>
 
         <a href="{{ url_for('logout') }}">Logout</a>
+
     </aside>
 
     <main class="main">

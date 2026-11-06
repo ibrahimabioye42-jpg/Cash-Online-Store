@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Manage Products | Cash Online Store</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            background: #f4f6fa;
+            color: #222;
+        }
+
+        header {
+            background: #171c2c;
+            color: white;
+            padding: 22px 30px;
+        }
+
+        .container {
+            padding: 30px;
+        }
+
+        .back {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #2455a4;
+            text-decoration: none;
+        }
+
+        .panel {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            overflow-x: auto;
+        }
+
+        .search {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        input {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        button {
+            background: #f5a623;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            min-width: 750px;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 14px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fc;
+        }
+
+        .quantity {
+            background: #e8f0ff;
+            padding: 6px 10px;
+            border-radius: 15px;
+        }
+
+        .empty {
+            color: #777;
+            padding: 20px 0;
+        }
+
+        @media(max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+
+            .search {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h2>CASH STORE | Product Management</h2>
+</header>
+
+<div class="container">
+
+    <a href="{{ url_for('admin_dashboard') }}" class="back">
+        ← Back to Dashboard
+    </a>
+
+    <div class="panel">
+
+        <h2>Manage Products</h2>
+        <p>View products listed by all registered sellers.</p>
+
+        <form method="GET" class="search">
+
+            <input
+                type="text"
+                name="q"
+                placeholder="Search product or seller..."
+                value="{{ search }}"
+            >
+
+            <button type="submit">Search</button>
+
+        </form>
+
+        <h3>Total Products: {{ products|length }}</h3>
+
+        {% if products %}
+
+        <table>
+
+            <thead>
+                <tr>
+                    <th>Product ID</th>
+                    <th>Product Name</th>
+                    <th>Price</th>
+                    <th>Quantity</th>
+                    <th>Seller</th>
+                    <th>Seller Email</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for product in products %}
+
+                <tr>
+                    <td>{{ product.id }}</td>
+                    <td>{{ product.name }}</td>
+                    <td>GH₵ {{ "%.2f"|format(product.price) }}</td>
+                    <td>
+                        <span class="quantity">
+                            {{ product.quantity }}
+                        </span>
+                    </td>
+                    <td>{{ product.seller_name }}</td>
+                    <td>{{ product.seller_email }}</td>
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+        {% else %}
+
+        <p class="empty">No products found.</p>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Store Analytics | Cash Online Store</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            background: #f4f6fa;
+            color: #222;
+        }
+
+        header {
+            background: #171c2c;
+            color: white;
+            padding: 22px 30px;
+        }
+
+        .container {
+            padding: 30px;
+        }
+
+        .back {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #2455a4;
+            text-decoration: none;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+            margin: 25px 0;
+        }
+
+        .card, .section {
+            background: white;
+            padding: 22px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        .card p {
+            color: #777;
+        }
+
+        .card h2 {
+            font-size: 27px;
+            margin-bottom: 0;
+        }
+
+        .section {
+            margin-bottom: 25px;
+            overflow-x: auto;
+        }
+
+        .section h2 {
+            margin-top: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 550px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 14px;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fc;
+        }
+
+        .empty {
+            color: #777;
+        }
+
+        @media(max-width: 900px) {
+            .cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media(max-width: 550px) {
+            .container {
+                padding: 15px;
+            }
+
+            .cards {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h2>CASH STORE | Store Analytics</h2>
+</header>
+
+<div class="container">
+
+    <a href="{{ url_for('admin_dashboard') }}" class="back">
+        ← Back to Dashboard
+    </a>
+
+    <h1>Store Analytics</h1>
+    <p>Monitor the performance of your marketplace.</p>
+
+    <!-- STATISTICS -->
+
+    <div class="cards">
+
+        <div class="card">
+            <p>Total Revenue</p>
+            <h2>GH₵ {{ "%.2f"|format(stats.total_revenue or 0) }}</h2>
+        </div>
+
+        <div class="card">
+            <p>Total Orders</p>
+            <h2>{{ stats.total_orders or 0 }}</h2>
+        </div>
+
+        <div class="card">
+            <p>Paid Orders</p>
+            <h2>{{ stats.paid_orders or 0 }}</h2>
+        </div>
+
+        <div class="card">
+            <p>Unpaid Orders</p>
+            <h2>{{ stats.unpaid_orders or 0 }}</h2>
+        </div>
+
+    </div>
+
+    <!-- MONTHLY SALES -->
+
+    <div class="section">
+
+        <h2>Monthly Sales</h2>
+
+        {% if monthly_sales %}
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    <th>Revenue</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for sale in monthly_sales %}
+                <tr>
+                    <td>{{ sale.month }}</td>
+                    <td>
+                        GH₵ {{ "%.2f"|format(sale.revenue or 0) }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% else %}
+        <p class="empty">No paid sales recorded yet.</p>
+        {% endif %}
+
+    </div>
+
+    <!-- TOP PRODUCTS -->
+
+    <div class="section">
+
+        <h2>Top-Selling Products</h2>
+
+        {% if top_products %}
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Units Sold</th>
+                    <th>Sales</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for product in top_products %}
+                <tr>
+                    <td>{{ product.name }}</td>
+                    <td>{{ product.units_sold }}</td>
+                    <td>
+                        GH₵ {{ "%.2f"|format(product.sales or 0) }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% else %}
+        <p class="empty">No paid product sales yet.</p>
+        {% endif %}
+
+    </div>
+
+    <!-- TOP SELLERS -->
+
+    <div class="section">
+
+        <h2>Top-Performing Sellers</h2>
+
+        {% if top_sellers %}
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Seller</th>
+                    <th>Orders</th>
+                    <th>Total Sales</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for seller in top_sellers %}
+                <tr>
+                    <td>{{ seller.seller_name }}</td>
+                    <td>{{ seller.total_orders }}</td>
+                    <td>
+                        GH₵ {{ "%.2f"|format(seller.total_sales or 0) }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% else %}
+        <p class="empty">No seller sales recorded yet.</p>
+        {% endif %}
+
+    </div>
+
+</div>
+
+</body>
+</html>
