@@ -3964,3 +3964,37 @@ input:focus-visible {
     }
 
 }
+.message-seller-btn {
+    background: #2563eb;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-top: 10px;
+}
+
+.message-seller-btn:hover {
+    background: #1d4ed8;
+}
+.messages-nav-link{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    position: relative;
+}
+.unread-badge {
+    background: #e53935;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    min-width: 19px;
+    height: 19px;
+    padding: 0 5px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}

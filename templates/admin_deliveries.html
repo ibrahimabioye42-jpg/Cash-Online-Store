@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Deliveries | Cash Online Store</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .delivery-container {
+            max-width: 1250px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+        .delivery-card {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.08);
+        }
+        .delivery-card h3 {
+            margin-top: 0;
+        }
+        .delivery-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .delivery-details p {
+            margin: 5px 0;
+        }
+        .delivery-form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: end;
+        }
+        .delivery-form label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .delivery-form input,
+        .delivery-form select {
+            padding: 9px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .delivery-form button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 5px;
+            background: #198754;
+            color: white;
+            cursor: pointer;
+        }
+        .admin-message {
+            padding: 12px;
+            margin-bottom: 15px;
+            background: #f1f1f1;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+<div class="delivery-container">
+    <h1>Delivery Management</h1>
+    <p>
+        <a href="{{ url_for('admin_dashboard') }}">Dashboard</a> |
+        <a href="{{ url_for('admin_orders') }}">Orders</a> |
+        <a href="{{ url_for('home') }}">Visit Store</a>
+    </p>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="admin-message">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+    <form method="GET" action="{{ url_for('admin_deliveries') }}">
+        <input
+            type="text"
+            name="q"
+            value="{{ search }}"
+            placeholder="Search order, buyer, seller or location"
+        >
+        <button type="submit">Search</button>
+    </form>
+    <h2>All Deliveries</h2>
+    {% for delivery in deliveries %}
+    <div class="delivery-card">
+        <h3>Order #{{ delivery.order_id }} — {{ delivery.product_name }}</h3>
+        <div class="delivery-details">
+            <div>
+                <p><strong>Buyer:</strong> {{ delivery.buyer_name }}</p>
+                <p><strong>Phone:</strong> {{ delivery.delivery_phone }}</p>
+                <p><strong>Seller:</strong> {{ delivery.seller_name }}</p>
+                <p><strong>Payment:</strong> {{ delivery.payment_status }}</p>
+            </div>
+            <div>
+                <p><strong>Region:</strong> {{ delivery.delivery_region }}</p>
+                <p><strong>Town:</strong> {{ delivery.delivery_town }}</p>
+                <p><strong>Address:</strong> {{ delivery.delivery_address }}</p>
+            </div>
+            <div>
+                <p><strong>Expected date:</strong>
+                    {{ delivery.expected_delivery_date or 'Not scheduled' }}
+                </p>
+                <p><strong>Time window:</strong>
+                    {{ delivery.delivery_start_time or '--' }}
+                    to
+                    {{ delivery.delivery_end_time or '--' }}
+                </p>
+                <p><strong>Status:</strong>
+                    {{ delivery.delivery_status or 'Pending' }}
+                </p>
+                <p><strong>Delivered at:</strong>
+                    {{ delivery.delivered_at or 'Not delivered' }}
+                </p>
+            </div>
+        </div>
+        <h4>Update Delivery</h4>
+        <form class="delivery-form"
+              method="POST"
+              action="{{ url_for('admin_update_delivery', order_id=delivery.order_id) }}">
+            <div>
+                <label>Expected Date</label>
+                <input type="date"
+                       name="expected_delivery_date"
+                       value="{{ delivery.expected_delivery_date or '' }}">
+            </div>
+            <div>
+                <label>Start Time</label>
+                <input type="time"
+                       name="delivery_start_time"
+                       value="{{ delivery.delivery_start_time or '' }}">
+            </div>
+            <div>
+                <label>End Time</label>
+                <input type="time"
+                       name="delivery_end_time"
+                       value="{{ delivery.delivery_end_time or '' }}">
+            </div>
+            <div>
+                <label>Delivery Status</label>
+                <select name="delivery_status" required>
+                    {% for status in ['Pending', 'Scheduled', 'In Transit', 'Delivered', 'Failed'] %}
+                        <option value="{{ status }}"
+                            {% if (delivery.delivery_status or 'Pending') == status %}
+                                selected
+                            {% endif %}>
+                            {{ status }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit">Save Update</button>
+        </form>
+    </div>
+    {% else %}
+        <p>No delivery records found.</p>
+    {% endfor %}
+</div>
+</body>
+</html>

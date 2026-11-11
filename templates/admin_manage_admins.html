@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Admins | Cash Online Store</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .admin-container {
+            max-width: 1100px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+        .admin-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background: #f4f4f4;
+        }
+        button {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .promote-button {
+            background: #198754;
+            color: white;
+        }
+        .remove-button {
+            background: #dc3545;
+            color: white;
+        }
+        .message {
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #f1f1f1;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <h1>Manage Administrators</h1>
+        <p>
+            <a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a> |
+            <a href="{{ url_for('admin_products') }}">Manage Products</a> |
+            <a href="{{ url_for('home') }}">Visit Store</a>
+        </p>
+        {% with messages = get_flashed_messages() %}
+            {% for message in messages %}
+                <div class="message">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+        <section class="admin-section">
+            <h2>Current Administrators</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Marketplace Role</th>
+                        <th>Admin Since</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for admin in admins %}
+                    <tr>
+                        <td>{{ admin.name }}</td>
+                        <td>{{ admin.email }}</td>
+                        <td>{{ admin.role }}</td>
+                        <td>{{ admin.created_at }}</td>
+                        <td>
+                            {% if admin.id != session.get('user_id') %}
+                            <form method="POST"
+                                  action="{{ url_for('admin_remove_access', user_id=admin.id) }}"
+                                  onsubmit="return confirm('Remove this person’s admin access?')">
+                                <button class="remove-button" type="submit">
+                                    Remove Admin
+                                </button>
+                            </form>
+                            {% else %}
+                                You
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5">No administrators found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        <section class="admin-section">
+            <h2>Promote a User to Admin</h2>
+            <p>Choose an existing account to grant administrator access.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.name }}</td>
+                        <td>{{ user.email }}</td>
+                        <td>{{ user.role }}</td>
+                        <td>
+                            <form method="POST"
+                                  action="{{ url_for('admin_promote_user', user_id=user.id) }}"
+                                  onsubmit="return confirm('Promote this user to admin?')">
+                                <button class="promote-button" type="submit">
+                                    Make Admin
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4">All users are already administrators.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </div>
+</body>
+</html>

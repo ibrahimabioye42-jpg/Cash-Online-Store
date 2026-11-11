@@ -63,6 +63,16 @@
 
             <a href="{{ url_for('notifications') }}">Notifications</a>
 
+             <a href="{{ url_for('messages') }}">Messages</a>
+
+             <a href="{{url_for('messages')}}" class="messages-nav-linl">Messages
+                {% if unread_messages > 0%}
+                <span class="unread-badge">{{unread_messages}}</span>
+                {% endif %}
+             </a>
+
+
+
             <form method="POST" action="{{ url_for('logout') }}">
                 <button class="nav-logout" type="submit">Logout</button>
             </form>
@@ -400,11 +410,27 @@
                                     View details
                                 </a>
 
+                                {% if session.get('user_id') and session.get('role') == 'buyer' %}
+    <form method="POST"
+          action="{{ url_for('start_conversation', product_id=product.id) }}">
+        <button type="submit" class="message-seller-btn">
+            Message Seller
+        </button>
+    </form>
+{% elif not session.get('user_id') %}
+    <a href="{{ url_for('login') }}">
+        Login to Message Seller
+    </a>
+{% endif %}
+
+
                                 {% if product['quantity'] > 0 %}
                                     <a class="market-buy-button"
                                        href="{{ url_for('buy_product', product_id=product['id']) }}">
                                         Buy Now
                                     </a>
+
+     
                                 {% else %}
                                     <button class="market-buy-button"
                                             type="button"

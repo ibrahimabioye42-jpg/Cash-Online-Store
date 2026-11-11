@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Messages - Cash Online Store</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .messages-container {
+            max-width: 850px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        .conversation-card {
+            display: block;
+            padding: 18px;
+            margin-bottom: 12px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            text-decoration: none;
+            color: inherit;
+            background: white;
+        }
+
+        .conversation-card:hover {
+            background: #f5f5f5;
+        }
+
+        .conversation-card h3 {
+            margin: 0 0 8px;
+        }
+
+        .last-message {
+            color: #666;
+        }
+
+        .unread {
+            color: #087b39;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="messages-container">
+    <h1>My Messages</h1>
+    <p>Communicate with buyers and sellers.</p>
+
+    {% if conversations %}
+        {% for conversation in conversations %}
+            <a class="conversation-card"
+               href="{{ url_for('view_conversation', conversation_id=conversation.id) }}">
+
+                <h3>
+                    {% if session.get('user_id') == conversation.buyer_id %}
+                        {{ conversation.seller_name }}
+                    {% else %}
+                        {{ conversation.buyer_name }}
+                    {% endif %}
+                </h3>
+
+                <p>
+                    Product:
+                    {{ conversation.product_name or "General conversation" }}
+                </p>
+
+                <p class="last-message">
+                    {{ conversation.last_message or "No messages yet." }}
+                </p>
+
+                {% if conversation.unread_count > 0 %}
+                    <p class="unread">
+                        {{ conversation.unread_count }} unread message(s)
+                    </p>
+                {% endif %}
+
+                <small>Last activity: {{ conversation.updated_at }}</small>
+            </a>
+        {% endfor %}
+    {% else %}
+        <p>You have no conversations yet.</p>
+    {% endif %}
+
+<a href="{{ url_for('home') }}">Back to Home</a>
+</div>
+
+</body>
+</html>

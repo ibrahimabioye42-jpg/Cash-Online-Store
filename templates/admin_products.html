@@ -148,12 +148,38 @@
                     <th>Quantity</th>
                     <th>Seller</th>
                     <th>Seller Email</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
 
             <tbody>
 
                 {% for product in products %}
+                <td>
+    {% if product.is_hidden %}
+        <span style="color: red;">Hidden</span>
+    {% else %}
+        <span style="color: green;">Visible</span>
+    {% endif %}
+</td>
+
+<td>
+    {% if product.is_hidden %}
+        <form method="POST"
+              action="{{ url_for('admin_restore_product', product_id=product.id) }}">
+            <button type="submit">Restore</button>
+        </form>
+    {% else %}
+        <form method="POST"
+              action="{{ url_for('admin_hide_product', product_id=product.id) }}">
+            <button type="submit"
+                    onclick="return confirm('Hide this product from the marketplace?')">
+                Hide Product
+            </button>
+        </form>
+    {% endif %}
+</td>
 
                 <tr>
                     <td>{{ product.id }}</td>

@@ -69,10 +69,26 @@
                     {{ product['seller_name'] }}
                 </a>
             </p>
+
+            
             <a class="primary-button"
                href="{{ url_for('buy_product', product_id=product['id']) }}">
                 Buy Now
             </a>
+   <form method="POST"
+      action="{{ url_for('start_conversation', product_id=product.id) }}">
+
+    <button type="submit">
+        Message Seller
+    </button>
+
+     <a href="{{url_for('messages')}}" class="messages-nav-linl">Messages
+                {% if unread_messages > 0%}
+                <span class="unread-badge">{{unread_messages}}</span>
+                {% endif %}
+             </a>
+
+    </form>
             <p class="muted">
                 You can browse products without an account.
                 You will be asked to log in or register when you choose to buy.

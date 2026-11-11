@@ -13,7 +13,7 @@ from werkzeug.security import (
 )
 import uuid
 from werkzeug.utils import secure_filename
-from flask import flash
+from flask import flash,jsonify
 
 import os
 import requests
@@ -53,6 +53,35 @@ def get_db_connection():
     connection = sqlite3.connect(DATABASE)
     connection.row_factory = sqlite3.Row
     return connection
+
+@app.context_processor
+def inject_unread_messages():
+    unread_messages = 0
+
+    if "user_id" in session:
+        connection = get_db_connection()
+
+        try:
+            unread_messages = connection.execute("""
+                SELECT COUNT(*)
+                FROM messages m
+                JOIN conversations c
+                    ON c.id = m.conversation_id
+                WHERE m.is_read = 0
+                AND m.sender_id != ?
+                AND (c.buyer_id = ? OR c.seller_id = ?)
+            """, (
+                session["user_id"],
+                session["user_id"],
+                session["user_id"]
+            )).fetchone()[0]
+
+        finally:
+            connection.close()
+
+    return {
+        "unread_messages": unread_messages
+    }
 
 def admin_required(view_function):
     @wraps(view_function)
@@ -111,6 +140,18 @@ def init_db():
             FOREIGN KEY (seller_id) REFERENCES users(id)
         )
     """)
+    # Add is_hidden column to existing products table if it doesn't exist
+    product_columns = connection.execute(
+        "PRAGMA table_info(products)"
+    ).fetchall()
+
+    column_names = [column[1] for column in product_columns]
+
+    if "is_hidden" not in column_names:
+        connection.execute("""
+            ALTER TABLE products
+            ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0
+        """)
 
     connection.execute("""
         CREATE INDEX IF NOT EXISTS idx_products_seller
@@ -132,6 +173,61 @@ def init_db():
             FOREIGN KEY (product_id) REFERENCES products(id)
         )
     """)
+
+    # Store conversations between buyers and sellers
+    connection.execute("""
+        CREATE TABLE IF NOT EXISTS conversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            buyer_id INTEGER NOT NULL,
+            seller_id INTEGER NOT NULL,
+            product_id INTEGER,
+            order_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (buyer_id) REFERENCES users(id),
+            FOREIGN KEY (seller_id) REFERENCES users(id),
+            FOREIGN KEY (product_id) REFERENCES products(id),
+            FOREIGN KEY (order_id) REFERENCES orders(id),
+
+            CHECK (buyer_id != seller_id)
+        )
+    """)
+
+    # Store individual messages in each conversation
+    connection.execute("""
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id INTEGER NOT NULL,
+            sender_id INTEGER NOT NULL,
+            message TEXT NOT NULL CHECK(length(trim(message)) > 0),
+            is_read INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (conversation_id)
+                REFERENCES conversations(id),
+
+            FOREIGN KEY (sender_id)
+                REFERENCES users(id)
+        )
+    """)
+
+    # Improve conversation and message searches
+    connection.execute("""
+        CREATE INDEX IF NOT EXISTS idx_conversations_buyer
+        ON conversations(buyer_id)
+    """)
+
+    connection.execute("""
+        CREATE INDEX IF NOT EXISTS idx_conversations_seller
+        ON conversations(seller_id)
+    """)
+
+    connection.execute("""
+        CREATE INDEX IF NOT EXISTS idx_messages_conversation
+        ON messages(conversation_id, created_at)
+    """)
+
     connection.execute("""
     CREATE TABLE IF NOT EXISTS notifications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -211,6 +307,7 @@ def init_db():
             FOREIGN KEY (seller_id) REFERENCES users(id)
         )
     """) 
+    
     # Add seller profile fields without deleting existing data
     connection = get_db_connection()
 
@@ -240,6 +337,8 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )
 """)
+            
+            
 
         connection.commit()
 
@@ -297,6 +396,8 @@ def home():
             FROM products AS p
             JOIN users AS u ON u.id = p.seller_id
             WHERE u.role = 'seller'
+            AND p.is_hidden = 0
+            AND p.quantity > 0
               
         """
 
@@ -334,6 +435,7 @@ def home():
             SELECT DISTINCT category
             FROM products
             WHERE quantity > 0
+            AND is_hidden = 0
             ORDER BY category
         """).fetchall()
 
@@ -396,8 +498,6 @@ def register():
         success=success,
         next_url=next_url
     )
-
-
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -1864,6 +1964,7 @@ def admin_products():
                     p.name,
                     p.price,
                     p.quantity,
+                    p.is_hidden,
                     u.name AS seller_name,
                     u.email AS seller_email
                 FROM products p
@@ -1883,6 +1984,7 @@ def admin_products():
                     p.name,
                     p.price,
                     p.quantity,
+                    p.is_hidden,
                     u.name AS seller_name,
                     u.email AS seller_email
                 FROM products p
@@ -1897,15 +1999,69 @@ def admin_products():
         "admin_products.html",
         products=products,
         search=search
-    )   
+    )  
+
+@app.route("/admin/products/<int:product_id>/hide", methods=["POST"])
+@admin_required
+def admin_hide_product(product_id):
+    connection = get_db_connection()
+
+    try:
+        product = connection.execute(
+            "SELECT id FROM products WHERE id = ?",
+            (product_id,)
+        ).fetchone()
+
+        if product is None:
+            abort(404)
+
+        connection.execute("""
+            UPDATE products
+            SET is_hidden = 1
+            WHERE id = ?
+        """, (product_id,))
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+    return redirect(url_for("admin_products"))
+
+
+@app.route("/admin/products/<int:product_id>/restore", methods=["POST"])
+@admin_required
+def admin_restore_product(product_id):
+    connection = get_db_connection()
+
+    try:
+        product = connection.execute(
+            "SELECT id FROM products WHERE id = ?",
+            (product_id,)
+        ).fetchone()
+
+        if product is None:
+            abort(404)
+
+        connection.execute("""
+            UPDATE products
+            SET is_hidden = 0
+            WHERE id = ?
+        """, (product_id,))
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+    return redirect(url_for("admin_products")) 
+
 @app.route("/admin/orders")
 @admin_required
 def admin_orders():
-
     search = request.args.get("q", "").strip()
 
     connection = get_db_connection()
-
     try:
         if search:
             orders = connection.execute("""
@@ -2064,6 +2220,758 @@ def admin_analytics():
         top_sellers=top_sellers,
         monthly_sales=monthly_sales
     ) 
+
+@app.route("/admin/manage-admins")
+@admin_required
+def manage_admins():
+    connection = get_db_connection()
+
+    try:
+        admins = connection.execute("""
+            SELECT u.id, u.name, u.email, u.role, a.created_at
+            FROM admin_users a
+            JOIN users u ON u.id = a.user_id
+            ORDER BY a.created_at DESC
+        """).fetchall()
+
+        users = connection.execute("""
+            SELECT id, name, email, role
+            FROM users
+            WHERE id NOT IN (
+                SELECT user_id FROM admin_users
+            )
+            ORDER BY name
+        """).fetchall()
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "admin_manage_admins.html",
+        admins=admins,
+        users=users
+    )
+
+
+@app.route("/admin/manage-admins/<int:user_id>/promote", methods=["POST"])
+@admin_required
+def admin_promote_user(user_id):
+    connection = get_db_connection()
+
+    try:
+        user = connection.execute("""
+            SELECT id FROM users WHERE id = ?
+        """, (user_id,)).fetchone()
+
+        if user is None:
+            abort(404)
+
+        connection.execute("""
+            INSERT OR IGNORE INTO admin_users (user_id)
+            VALUES (?)
+        """, (user_id,))
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+    return redirect(url_for("manage_admins"))
+
+
+@app.route("/admin/manage-admins/<int:user_id>/remove", methods=["POST"])
+@admin_required
+def admin_remove_access(user_id):
+    current_admin_id = session.get("user_id")
+
+    # Prevent an admin from removing their own access here.
+    if user_id == current_admin_id:
+        flash("You cannot remove your own admin access here.", "error")
+        return redirect(url_for("manage_admins"))
+
+    connection = get_db_connection()
+
+    try:
+        admin_count = connection.execute("""
+            SELECT COUNT(*) FROM admin_users
+        """).fetchone()[0]
+
+        # Prevent removing the final administrator.
+        if admin_count <= 1:
+            flash("You cannot remove the last administrator.", "error")
+            return redirect(url_for("manage_admins"))
+
+        connection.execute("""
+            DELETE FROM admin_users
+            WHERE user_id = ?
+        """, (user_id,))
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+    flash("Admin access removed.", "success")
+    return redirect(url_for("manage_admins"))
+
+@app.route("/admin/orders/<int:order_id>/update-status", methods=["POST"])
+@admin_required
+def admin_update_order_status(order_id):
+
+    new_status = request.form.get("status", "").strip()
+
+    # Only allow these order statuses
+    allowed_statuses = [
+        "Pending",
+        "Processing",
+        "Completed",
+        "Cancelled"
+    ]
+
+    if new_status not in allowed_statuses:
+        flash("Invalid order status.", "error")
+        return redirect(url_for("admin_orders"))
+
+    connection = get_db_connection()
+
+    try:
+        order = connection.execute("""
+            SELECT
+                o.id,
+                o.buyer_id,
+                o.status,
+                o.payment_status,
+                p.name AS product_name
+            FROM orders o
+            JOIN products p ON p.id = o.product_id
+            WHERE o.id = ?
+        """, (order_id,)).fetchone()
+
+        if order is None:
+            abort(404)
+
+        # Do not allow an unpaid order to be processed or completed.
+        if (
+            order["payment_status"] != "Paid"
+            and new_status in ("Processing", "Completed")
+        ):
+            flash(
+                "This order must have verified payment before processing.",
+                "error"
+            )
+            return redirect(url_for("admin_orders"))
+
+        connection.execute("""
+            UPDATE orders
+            SET status = ?
+            WHERE id = ?
+        """, (new_status, order_id))
+
+        message = (
+            f"Your order for {order['product_name']} "
+            f"has been updated to {new_status}."
+        )
+
+        connection.execute("""
+            INSERT INTO notifications (user_id, order_id, message)
+            VALUES (?, ?, ?)
+        """, (
+            order["buyer_id"],
+            order_id,
+            message
+        ))
+
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+    flash("Order status updated successfully.", "success")
+    return redirect(url_for("admin_orders"))
+
+@app.route("/admin/deliveries")
+@admin_required
+def admin_deliveries():
+
+    search = request.args.get("q", "").strip()
+
+    connection = get_db_connection()
+
+    try:
+        query = """
+            SELECT
+                o.id AS order_id,
+                o.buyer_id,
+                o.delivery_region,
+                o.delivery_town,
+                o.delivery_address,
+                o.delivery_phone,
+                o.expected_delivery_date,
+                o.delivery_start_time,
+                o.delivery_end_time,
+                o.delivery_status,
+                o.delivered_at,
+                o.payment_status,
+                p.name AS product_name,
+                buyer.name AS buyer_name,
+                seller.name AS seller_name
+
+            FROM orders o
+
+            JOIN products p ON p.id = o.product_id
+            JOIN users buyer ON buyer.id = o.buyer_id
+            JOIN users seller ON seller.id = p.seller_id
+
+            WHERE 1 = 1
+        """
+
+        parameters = []
+
+        if search:
+            query += """
+                AND (
+                    CAST(o.id AS TEXT) LIKE ?
+                    OR buyer.name LIKE ?
+                    OR seller.name LIKE ?
+                    OR p.name LIKE ?
+                    OR o.delivery_town LIKE ?
+                    OR o.delivery_region LIKE ?
+                )
+            """
+
+            term = f"%{search}%"
+            parameters.extend([term] * 6)
+
+        query += " ORDER BY o.id DESC"
+
+        deliveries = connection.execute(
+            query, parameters
+        ).fetchall()
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "admin_deliveries.html",
+        deliveries=deliveries,
+        search=search
+    )
+@app.route(
+    "/admin/deliveries/<int:order_id>/update",
+    methods=["POST"]
+)
+@admin_required
+def admin_update_delivery(order_id):
+
+    delivery_date = request.form.get(
+        "expected_delivery_date", ""
+    ).strip()
+
+    start_time = request.form.get(
+        "delivery_start_time", ""
+    ).strip()
+
+    end_time = request.form.get(
+        "delivery_end_time", ""
+    ).strip()
+
+    delivery_status = request.form.get(
+        "delivery_status", ""
+    ).strip()
+
+    allowed_statuses = [
+        "Pending",
+        "Scheduled",
+        "In Transit",
+        "Delivered",
+        "Failed"
+    ]
+
+    if delivery_status not in allowed_statuses:
+        flash("Invalid delivery status.", "error")
+        return redirect(url_for("admin_deliveries"))
+
+    if bool(start_time) != bool(end_time):
+        flash("Please provide both delivery times.", "error")
+        return redirect(url_for("admin_deliveries"))
+
+    if start_time and end_time and start_time >= end_time:
+        flash("The delivery end time must be later than the start time.", "error")
+        return redirect(url_for("admin_deliveries"))
+
+    connection = get_db_connection()
+
+    try:
+        order = connection.execute("""
+            SELECT
+                o.id,
+                o.buyer_id,
+                o.delivery_status,
+                p.name AS product_name
+            FROM orders o
+            JOIN products p ON p.id = o.product_id
+            WHERE o.id = ?
+        """, (order_id,)).fetchone()
+
+        if order is None:
+            abort(404)
+
+        # Record the delivery completion time.
+        delivered_at = None
+
+        if delivery_status == "Delivered":
+            delivered_at = connection.execute(
+                "SELECT CURRENT_TIMESTAMP"
+            ).fetchone()[0]
+
+        connection.execute("""
+            UPDATE orders
+            SET expected_delivery_date = ?,
+                delivery_start_time = ?,
+                delivery_end_time = ?,
+                delivery_status = ?,
+                delivered_at = ?
+            WHERE id = ?
+        """, (
+            delivery_date or None,
+            start_time or None,
+            end_time or None,
+            delivery_status,
+            delivered_at,
+            order_id
+        ))
+
+        message = (
+            f"Delivery update for {order['product_name']}: "
+            f"{delivery_status}."
+        )
+
+        if delivery_date:
+            message += f" Expected date: {delivery_date}."
+
+        if start_time and end_time:
+            message += f" Time window: {start_time}–{end_time}."
+
+        connection.execute("""
+            INSERT INTO notifications (user_id, order_id, message)
+            VALUES (?, ?, ?)
+        """, (
+            order["buyer_id"],
+            order_id,
+            message
+        ))
+
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+    flash("Delivery information updated successfully.", "success")
+    return redirect(url_for("admin_deliveries"))
+
+@app.route("/messages/start/<int:product_id>", methods=["POST"])
+def start_conversation(product_id):
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user_role") != "buyer":
+        abort(403)
+
+    buyer_id = session["user_id"]
+
+    connection = get_db_connection()
+
+    try:
+        # Find the product and its seller
+        product = connection.execute("""
+            SELECT p.id, p.seller_id, p.name
+            FROM products p
+            JOIN users u ON u.id = p.seller_id
+            WHERE p.id = ?
+              AND u.role = 'seller'
+              AND p.is_hidden = 0
+        """, (product_id,)).fetchone()
+
+        if product is None:
+            abort(404)
+
+        seller_id = product["seller_id"]
+
+        if buyer_id == seller_id:
+            abort(403)
+
+        # Check whether a conversation already exists
+        conversation = connection.execute("""
+            SELECT id
+            FROM conversations
+            WHERE buyer_id = ?
+              AND seller_id = ?
+              AND product_id = ?
+              AND order_id IS NULL
+        """, (
+            buyer_id,
+            seller_id,
+            product_id
+        )).fetchone()
+
+        if conversation:
+            conversation_id = conversation["id"]
+
+        else:
+            cursor = connection.execute("""
+                INSERT INTO conversations (
+                    buyer_id,
+                    seller_id,
+                    product_id
+                )
+                VALUES (?, ?, ?)
+            """, (
+                buyer_id,
+                seller_id,
+                product_id
+            ))
+
+            conversation_id = cursor.lastrowid
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+    return redirect(
+        url_for(
+            "view_conversation",
+            conversation_id=conversation_id
+        )
+    )
+@app.route("/messages")
+def messages():
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    user_id = session["user_id"]
+
+    connection = get_db_connection()
+
+    try:
+        conversations = connection.execute("""
+            SELECT
+                c.id,
+                c.buyer_id,
+                c.seller_id,
+                c.product_id,
+                c.order_id,
+                c.updated_at,
+
+                p.name AS product_name,
+
+                CASE
+                    WHEN c.buyer_id = ?
+                    THEN seller.name
+                    ELSE buyer.name
+                END AS other_user_name,
+
+                (
+                    SELECT message
+                    FROM messages m
+                    WHERE m.conversation_id = c.id
+                    ORDER BY m.id DESC
+                    LIMIT 1
+                ) AS last_message,
+
+                (
+                    SELECT COUNT(*)
+                    FROM messages m
+                    WHERE m.conversation_id = c.id
+                      AND m.sender_id != ?
+                      AND m.is_read = 0
+                ) AS unread_count
+
+            FROM conversations c
+
+            JOIN users buyer ON buyer.id = c.buyer_id
+            JOIN users seller ON seller.id = c.seller_id
+
+            LEFT JOIN products p ON p.id = c.product_id
+
+            WHERE c.buyer_id = ?
+               OR c.seller_id = ?
+
+            ORDER BY c.updated_at DESC, c.id DESC
+
+        """, (
+            user_id,
+            user_id,
+            user_id,
+            user_id
+        )).fetchall()
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "messages.html",
+        conversations=conversations
+    )
+@app.route("/messages/<int:conversation_id>")
+def view_conversation(conversation_id):
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    user_id = session["user_id"]
+
+    connection = get_db_connection()
+
+    try:
+        conversation = connection.execute("""
+            SELECT
+                c.*,
+                buyer.name AS buyer_name,
+                seller.name AS seller_name,
+                p.name AS product_name
+
+            FROM conversations c
+
+            JOIN users buyer ON buyer.id = c.buyer_id
+            JOIN users seller ON seller.id = c.seller_id
+
+            LEFT JOIN products p ON p.id = c.product_id
+
+            WHERE c.id = ?
+              AND (c.buyer_id = ? OR c.seller_id = ?)
+
+        """, (
+            conversation_id,
+            user_id,
+            user_id
+        )).fetchone()
+
+        if conversation is None:
+            abort(404)
+
+        # Mark messages from the other participant as read
+        connection.execute("""
+            UPDATE messages
+            SET is_read = 1
+            WHERE conversation_id = ?
+              AND sender_id != ?
+        """, (
+            conversation_id,
+            user_id
+        ))
+
+        message_list = connection.execute("""
+            SELECT
+                m.id,
+                m.sender_id,
+                m.message,
+                m.is_read,
+                m.created_at,
+                u.name AS sender_name
+
+            FROM messages m
+
+            JOIN users u ON u.id = m.sender_id
+
+            WHERE m.conversation_id = ?
+
+            ORDER BY m.id ASC
+
+        """, (conversation_id,)).fetchall()
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "conversation.html",
+        conversation=conversation,
+        chat_messages=message_list
+    ) 
+
+@app.route(
+    "/messages/<int:conversation_id>/send",
+    methods=["POST"]
+)
+def send_message(conversation_id):
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    user_id = session["user_id"]
+
+    message = request.form.get("message", "").strip()
+
+    if not message:
+        flash("Please enter a message.", "error")
+        return redirect(
+            url_for(
+                "view_conversation",
+                conversation_id=conversation_id
+            )
+        )
+
+    if len(message) > 2000:
+        flash("Your message is too long.", "error")
+        return redirect(
+            url_for(
+                "view_conversation",
+                conversation_id=conversation_id
+            )
+        )
+
+    connection = get_db_connection()
+
+    try:
+        conversation = connection.execute("""
+            SELECT buyer_id, seller_id
+            FROM conversations
+            WHERE id = ?
+              AND (buyer_id = ? OR seller_id = ?)
+        """, (
+            conversation_id,
+            user_id,
+            user_id
+        )).fetchone()
+
+        if conversation is None:
+            abort(404)
+
+        connection.execute("""
+            INSERT INTO messages (
+                conversation_id,
+                sender_id,
+                message
+            )
+            VALUES (?, ?, ?)
+        """, (
+            conversation_id,
+            user_id,
+            message
+        ))
+
+        connection.execute("""
+            UPDATE conversations
+            SET updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (conversation_id,))
+
+        # Notify the other participant
+        recipient_id = (
+            conversation["seller_id"]
+            if user_id == conversation["buyer_id"]
+            else conversation["buyer_id"]
+        )
+
+        connection.execute("""
+            INSERT INTO notifications (
+                user_id,
+                order_id,
+                message
+            )
+            VALUES (?, NULL, ?)
+        """, (
+            recipient_id,
+            "You have received a new marketplace message."
+        ))
+
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+    return redirect(
+        url_for(
+            "view_conversation",
+            conversation_id=conversation_id
+        )
+    )
+
+@app.route("/messages/<int:conversation_id>/updates")
+def get_new_messages(conversation_id):
+
+    if "user_id" not in session:
+        return jsonify({"error": "Please log in"}), 401
+
+    user_id = session["user_id"]
+
+    connection = get_db_connection()
+
+    try:
+        # Confirm that the logged-in user belongs to this conversation.
+        conversation = connection.execute("""
+            SELECT id
+            FROM conversations
+            WHERE id = ?
+            AND (buyer_id = ? OR seller_id = ?)
+        """, (conversation_id, user_id, user_id)).fetchone()
+
+        if conversation is None:
+            return jsonify({"error": "Access denied"}), 403
+
+        # Get the ID of the last message already displayed.
+        after_id = request.args.get("after", 0, type=int)
+
+        # Fetch only newer messages.
+        new_messages = connection.execute("""
+            SELECT
+                m.id,
+                m.sender_id,
+                m.message,
+                m.created_at,
+                u.name AS sender_name
+            FROM messages m
+            JOIN users u ON u.id = m.sender_id
+            WHERE m.conversation_id = ?
+            AND m.id > ?
+            ORDER BY m.id ASC
+        """, (conversation_id, after_id)).fetchall()
+
+        result = []
+
+        for message in new_messages:
+            result.append({
+                "id": message["id"],
+                "sender_id": message["sender_id"],
+                "sender_name": message["sender_name"],
+                "message": message["message"],
+                "created_at": message["created_at"]
+            })
+
+        # Mark messages from the other participant as read.
+        connection.execute("""
+            UPDATE messages
+            SET is_read = 1
+            WHERE conversation_id = ?
+            AND sender_id != ?
+        """, (conversation_id, user_id))
+
+        connection.commit()
+
+        return jsonify({"messages": result})
+
+    finally:
+        connection.close()
+
+
+
+
 
 
 
