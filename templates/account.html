@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>My Account - Cash Online Store</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+    <style>
+        .account-container {
+            max-width: 650px;
+            margin: 25px auto;
+            padding: 15px;
+        }
+
+        .account-header {
+            padding: 20px 10px;
+        }
+
+        .account-header h2 {
+            margin-bottom: 5px;
+        }
+
+        .account-email {
+            color: #888;
+        }
+
+        .account-credit {
+            padding: 18px;
+            color: #2875ce;
+            font-weight: bold;
+        }
+
+        .account-section-title {
+            background: #f2f2f2;
+            padding: 12px;
+            font-weight: bold;
+        }
+
+        .account-link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 12px;
+            border-bottom: 1px solid #eee;
+            text-decoration: none;
+            color: #333;
+        }
+
+        .account-link:hover {
+            background: #f8f8f8;
+        }
+
+        .account-link span {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .account-badge {
+            background: #e53935;
+            color: white;
+            border-radius: 20px;
+            padding: 3px 8px;
+            font-size: 12px;
+        }
+
+        .account-help {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding: 15px 0;
+        }
+
+        .help-link {
+            padding: 18px 5px;
+            text-align: center;
+            background: #f39224;
+            color: white;
+            border-radius: 8px;
+            text-decoration: none;
+        }
+
+        @media (max-width: 600px) {
+            .account-container {
+                margin: 10px auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="account-container">
+
+    <div class="account-header">
+        <h2>Welcome {{ user.name }}!</h2>
+        <p class="account-email">{{ user.email }}</p>
+    </div>
+
+    <div class="account-credit">
+        Store credit balance: GH₵ 0.00
+    </div>
+
+    <div class="account-help">
+        <a href="{{ url_for('messages') }}" class="help-link">
+            Live Chat
+        </a>
+
+        <a href="{{ url_for('messages') }}" class="help-link">
+            Messages
+        </a>
+    </div>
+
+    <div class="account-section-title">
+        My Account
+    </div>
+
+    <a href="{{ url_for('home') }}" class="account-link">
+        <span>🏠 Home</span> 
+    </a>
+
+    <a href="{{ url_for('my_orders') }}">
+    My Orders
+    <span>{{ order_count }}</span><br>
+    <br>
+</a>
+
+<a href="{{url_for('notifications') }}">
+    Notifications
+    <span>{{ notification_count }}</span>
+</a>
+
+ <a href="{{ url_for('messages') }}" class="account-link">
+ <span>✉️ Messages</span>
+
+        {% if unread_messages > 0 %}
+            <span class="account-badge">
+                {{ unread_messages }}
+            </span>
+        {% endif %}
+    </a>
+
+    <a href="{{ url_for('home') }}" class="account-link">
+        <span>⭐ Ratings & Reviews</span> ›
+    </a>
+
+    <a href="{{ url_for('home') }}" class="account-link">
+        <span>❤️ Wishlist</span> ›
+    </a>
+<form method="POST" action="{{ url_for('logout') }}">
+    <button type="submit" class="account-logout-btn">
+        Logout
+    </button>
+</form>
+
+</div>
+
+</body>
+</html>

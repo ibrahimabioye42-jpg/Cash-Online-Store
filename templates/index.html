@@ -42,46 +42,64 @@
     </form>
 
     <nav class="nav-links">
-        <a href="{{ url_for('home') }}">Home</a>
-        <a href="#categories">Categories</a>
-        <a href="#products">Shop</a>
-      
 
-        {% if session.get('user_id') %}
-            <span class="welcome-user">
-                Hi, {{ session.get('user_name') }}!
-            </span>
+    <a href="{{ url_for('home') }}">Home</a>
+    <a href="#categories">Categories</a>
+    <a href="#products">Shop</a>
 
-            {% if session.get('user_role') == 'buyer' %}
-                <a href="{{ url_for('my_orders') }}">My Orders</a>
-            {% endif %}
+    {% if session.get('user_id') %}
 
-            {% if session.get('user_role') == 'seller' %}
-                <a href="{{ url_for('seller_dashboard') }}">Dashboard</a>
-                <a href="{{ url_for('seller_orders') }}">Orders</a>
-            {% endif %}
+        {% if session.get('user_role') == 'buyer' %}
 
-            <a href="{{ url_for('notifications') }}">Notifications</a>
+            <!-- BUYER ACCOUNT ICON -->
+            <a href="{{ url_for('account') }}"
+               class="buyer-account-nav"
+               title="My Account">
 
-             <a href="{{ url_for('messages') }}">Messages</a>
+                <span class="account-icon">👤</span>
+                <span>Account</span>
 
-             <a href="{{url_for('messages')}}" class="messages-nav-linl">Messages
-                {% if unread_messages > 0%}
-                <span class="unread-badge">{{unread_messages}}</span>
-                {% endif %}
-             </a>
+            </a>
 
+        {% elif session.get('user_role') == 'seller' %}
 
+            <!-- SELLER NAVIGATION -->
+            <a href="{{ url_for('seller_dashboard') }}">
+                Dashboard
+            </a>
+
+            <a href="{{ url_for('seller_orders') }}">
+                Orders
+            </a>
+
+            <a href="{{ url_for('notifications') }}">
+                Notifications
+            </a>
+
+            <a href="{{ url_for('messages') }}">
+                Messages
+            </a>
 
             <form method="POST" action="{{ url_for('logout') }}">
-                <button class="nav-logout" type="submit">Logout</button>
+                <button class="nav-logout" type="submit">
+                    Logout
+                </button>
             </form>
-        {% else %}
-            <a href="{{ url_for('login') }}">Login</a>
-            <a class="signup-button"
-               href="{{ url_for('register') }}">Join Free</a>
+
         {% endif %}
-    </nav>
+
+    {% else %}
+
+        <a href="{{ url_for('login') }}">Login</a>
+
+        <a class="signup-button"
+           href="{{ url_for('register') }}">
+            Join Free
+        </a>
+
+    {% endif %}
+
+</nav>
 </header>
 
 <main>

@@ -499,6 +499,40 @@ def register():
         next_url=next_url
     )
 
+@app.route("/account")
+def account():
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    connection = get_db_connection()
+
+    try:
+        user = connection.execute("""
+            SELECT id, name, email, profile_image
+            FROM users
+            WHERE id = ?
+        """, (session["user_id"],)).fetchone()
+
+        if user is None:
+            session.clear()
+            return redirect(url_for("login"))
+
+        order_count = connection.execute("""
+            SELECT COUNT(*)
+            FROM orders
+            WHERE buyer_id = ?
+        """, (session["user_id"],)).fetchone()[0]
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "account.html",
+        user=user,
+        order_count=order_count
+    )
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = None
@@ -555,7 +589,7 @@ def login():
                 return redirect(url_for("seller_dashboard"))
 
             # Redirect buyer to requested page or homepage
-            return redirect(next_url or url_for("home"))
+            return redirect(next_url or url_for("account"))
 
         else:
             error = "Invalid email or password."
