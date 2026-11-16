@@ -4,89 +4,208 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>My Account - Cash Online Store</title>
-
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='style.css') }}">
+    <title>My Account | Cash Online Store</title>
 
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background: #f5f6fa;
+            color: #333;
+        }
+
+        .navbar {
+            background: white;
+            padding: 18px 6%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .logo {
+            font-size: 22px;
+            font-weight: bold;
+            color: #222;
+            text-decoration: none;
+        }
+
+        .logo span {
+            color: blue;
+        }
+
+        .home-link {
+            color: blue;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
         .account-container {
             max-width: 650px;
             margin: 25px auto;
-            padding: 15px;
+            padding: 0 15px;
         }
 
-        .account-header {
-            padding: 20px 10px;
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: white;
+            padding: 22px;
+            border-radius: 12px;
+            margin-bottom: 20px;
         }
 
-        .account-header h2 {
-            margin-bottom: 5px;
+        .profile-image,
+        .profile-placeholder {
+            width: 75px;
+            height: 75px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #fff0e8;
         }
 
-        .account-email {
+        .profile-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff0e8;
+            font-size: 30px;
+        }
+
+        .profile-details h2 {
+            font-size: 19px;
+            margin-bottom: 6px;
+        }
+
+        .profile-details p {
             color: #888;
+            font-size: 13px;
         }
 
-        .account-credit {
-            padding: 18px;
-            color: #2875ce;
+        .edit-link {
+            display: inline-block;
+            color: blue;
+            font-size: 13px;
+            margin-top: 8px;
+            text-decoration: none;
             font-weight: bold;
         }
 
-        .account-section-title {
-            background: #f2f2f2;
-            padding: 12px;
+        .account-summary {
+            background: white;
+            padding: 17px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            line-height: 2;
+        }
+
+        .account-summary p {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        .account-summary p:last-child {
+            border-bottom: none;
+        }
+
+        .section-heading {
+            font-size: 15px;
             font-weight: bold;
+            padding: 16px 12px;
+            background: #eee;
+            margin-top: 12px;
         }
 
         .account-link {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 18px 12px;
+            background: white;
+            padding: 18px 15px;
             border-bottom: 1px solid #eee;
-            text-decoration: none;
             color: #333;
+            text-decoration: none;
+            transition: 0.2s;
         }
 
         .account-link:hover {
-            background: #f8f8f8;
+            background: #fff8f4;
         }
 
-        .account-link span {
+        .link-left {
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 14px;
+            font-size: 15px;
+        }
+
+        .link-icon {
+            font-size: 21px;
+            width: 28px;
+            text-align: center;
+        }
+
+        .arrow {
+            color: #aaa;
+            font-size: 22px;
         }
 
         .account-badge {
-            background: #e53935;
+            background: blue;
             color: white;
             border-radius: 20px;
-            padding: 3px 8px;
-            font-size: 12px;
+            padding: 3px 9px;
+            font-size: 11px;
+            margin-left: 8px;
         }
 
-        .account-help {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            padding: 15px 0;
+        .logout-form {
+            margin-top: 22px;
         }
 
-        .help-link {
-            padding: 18px 5px;
-            text-align: center;
-            background: #f39224;
-            color: white;
+        .logout-button {
+            width: 100%;
+            padding: 16px;
+            background: white;
+            border: 1px solid #e53935;
+            color: #e53935;
             border-radius: 8px;
-            text-decoration: none;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
         }
 
-        @media (max-width: 600px) {
+        .logout-button:hover {
+            background: #e53935;
+            color: white;
+        }
+
+        footer {
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+            padding: 25px 10px;
+        }
+
+        @media(max-width: 480px) {
+            .navbar {
+                padding: 15px;
+            }
+
+            .logo {
+                font-size: 19px;
+            }
+
             .account-container {
-                margin: 10px auto;
+                margin-top: 15px;
             }
         }
     </style>
@@ -94,70 +213,150 @@
 
 <body>
 
-<div class="account-container">
-
-    <div class="account-header">
-        <h2>Welcome {{ user.name }}!</h2>
-        <p class="account-email">{{ user.email }}</p>
-    </div>
-
-    <div class="account-credit">
-        Store credit balance: GH₵ 0.00
-    </div>
-
-    <div class="account-help">
-        <a href="{{ url_for('messages') }}" class="help-link">
-            Live Chat
-        </a>
-
-        <a href="{{ url_for('messages') }}" class="help-link">
-            Messages
-        </a>
-    </div>
-
-    <div class="account-section-title">
-        My Account
-    </div>
-
-    <a href="{{ url_for('home') }}" class="account-link">
-        <span>🏠 Home</span> 
+<header class="navbar">
+    <a href="{{ url_for('home') }}" class="logo">
+        Cash Online <span>Store</span>
     </a>
 
-    <a href="{{ url_for('my_orders') }}">
-    My Orders
-    <span>{{ order_count }}</span><br>
-    <br>
-</a>
+    <a href="{{ url_for('home') }}" class="home-link">
+        Home
+    </a>
+</header>
 
-<a href="{{url_for('notifications') }}">
-    Notifications
-    <span>{{ notification_count }}</span>
-</a>
 
- <a href="{{ url_for('messages') }}" class="account-link">
- <span>✉️ Messages</span>
+<main class="account-container">
+
+    <!-- PROFILE -->
+    <div class="profile-header">
+
+        {% if user.profile_image %}
+            <img
+                src="{{ url_for('static', filename='uploads/' + user.profile_image) }}"
+                alt="Profile Picture"
+                class="profile-image"
+            >
+        {% else %}
+            <div class="profile-placeholder">👤</div>
+        {% endif %}
+
+        <div class="profile-details">
+            <h2>Hello, {{ user.name }}!</h2>
+            <p>{{ user.email }}</p>
+
+            <a href="{{ url_for('edit_account') }}"
+               class="edit-link">
+                Edit Profile
+            </a>
+        </div>
+
+    </div>
+
+
+    <!-- ACCOUNT SUMMARY -->
+    <div class="account-summary">
+        <p>
+            <span>Total Orders</span>
+            <strong>{{ order_count }}</strong>
+        </p>
+
+        <p>
+            <span>Unread Messages</span>
+            <strong>{{ unread_messages }}</strong>
+        </p>
+
+        <p>
+            <span>Store Credit</span>
+            <strong>GH₵0.00</strong>
+        </p>
+    </div>
+
+
+    <!-- SHOPPING -->
+    <div class="section-heading">MY SHOPPING</div>
+
+    <a href="{{ url_for('my_orders') }}" class="account-link">
+        <span class="link-left">
+            <span class="link-icon">📦</span>
+            My Orders
+        </span>
+        <span class="arrow">›</span>
+    </a>
+
+    <a href="{{ url_for('notifications') }}" class="account-link">
+        <span class="link-left">
+            <span class="link-icon">🔔</span>
+            Notifications
+        </span>
+        <span class="arrow">›</span>
+    </a>
+
+    <a href="{{ url_for('messages') }}" class="account-link">
+        <span class="link-left">
+            <span class="link-icon">✉️</span>
+            Messages
+        </span>
 
         {% if unread_messages > 0 %}
-            <span class="account-badge">
-                {{ unread_messages }}
-            </span>
+            <span class="account-badge">{{ unread_messages }}</span>
+        {% else %}
+            <span class="arrow">›</span>
         {% endif %}
     </a>
 
     <a href="{{ url_for('home') }}" class="account-link">
-        <span>⭐ Ratings & Reviews</span> ›
+        <span class="link-left">
+            <span class="link-icon">⭐</span>
+            Ratings & Reviews
+        </span>
+        <span class="arrow">›</span>
     </a>
 
     <a href="{{ url_for('home') }}" class="account-link">
-        <span>❤️ Wishlist</span> ›
+        <span class="link-left">
+            <span class="link-icon">❤️</span>
+            Wishlist
+        </span>
+        <span class="arrow">›</span>
     </a>
-<form method="POST" action="{{ url_for('logout') }}">
-    <button type="submit" class="account-logout-btn">
-        Logout
-    </button>
-</form>
 
-</div>
+
+    <!-- PERSONAL ACCOUNT -->
+    <div class="section-heading">ACCOUNT SETTINGS</div>
+
+    <a href="{{ url_for('edit_account') }}" class="account-link">
+        <span class="link-left">
+            <span class="link-icon">👤</span>
+            Personal Information
+        </span>
+        <span class="arrow">›</span>
+    </a>
+
+    <a href="{{ url_for('change_password') }}" class="account-link">
+        <span class="link-left">
+            <span class="link-icon">🔒</span>
+            Change Password
+        </span>
+        <span class="arrow">›</span>
+    </a>
+
+
+    <!-- LOGOUT -->
+    <form method="POST"
+          action="{{ url_for('logout') }}"
+          class="logout-form">
+
+        <button type="submit" class="logout-button">
+            ↪ Logout
+        </button>
+
+    </form>
+
+</main>
+
+
+<footer>
+    © 2026 Cash Online Store. All rights reserved.
+</footer>
 
 </body>
 </html>

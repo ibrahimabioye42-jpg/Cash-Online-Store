@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Edit Profile | Cash Online Store</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: #f5f6fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 25px 15px;
+        }
+
+        .edit-profile-container {
+            width: 100%;
+            max-width: 520px;
+            background: #fff;
+            padding: 35px;
+            border-radius: 15px;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.08);
+        }
+
+        .page-icon {
+            width: 65px;
+            height: 65px;
+            margin: 0 auto 18px;
+            border-radius: 50%;
+            background: #fff0e8;
+            color: #f36b21;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+        }
+
+        h2 {
+            text-align: center;
+            color: #222;
+            margin-bottom: 10px;
+        }
+
+        .description {
+            text-align: center;
+            color: #777;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 28px;
+        }
+
+        .profile-preview {
+            text-align: center;
+            margin-bottom: 22px;
+        }
+
+        .profile-preview img,
+        .profile-placeholder {
+            width: 115px;
+            height: 115px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #fff0e8;
+        }
+
+        .profile-placeholder {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #f1f1f1;
+            font-size: 40px;
+        }
+
+        .profile-preview p {
+            color: #777;
+            font-size: 13px;
+            margin-top: 9px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        input[type="text"],
+        input[type="email"] {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+            margin-bottom: 20px;
+            font-size: 15px;
+        }
+
+        input:focus {
+            border-color: #f36b21;
+            box-shadow: 0 0 0 3px rgba(243, 107, 33, 0.1);
+        }
+
+        .file-upload {
+            width: 100%;
+            padding: 13px;
+            border: 1px dashed #f36b21;
+            border-radius: 8px;
+            background: #fffaf7;
+            margin-bottom: 25px;
+            cursor: pointer;
+        }
+
+        .file-note {
+            color: #888;
+            font-size: 12px;
+            margin-top: -15px;
+            margin-bottom: 22px;
+        }
+
+        .save-button {
+            width: 100%;
+            padding: 14px;
+            background: #f36b21;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .save-button:hover {
+            background: #d95712;
+        }
+
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 22px;
+            color: #f36b21;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .flash-message {
+            padding: 12px;
+            border-radius: 7px;
+            margin-bottom: 18px;
+            font-size: 14px;
+        }
+
+        .flash-message.error {
+            background: #ffe8e8;
+            color: #b42318;
+        }
+
+        .flash-message.success {
+            background: #e7f7ed;
+            color: #187a3d;
+        }
+
+        @media (max-width: 480px) {
+            .edit-profile-container {
+                padding: 25px 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="edit-profile-container">
+
+        <div class="page-icon">👤</div>
+
+        <h2>Edit Personal Information</h2>
+
+        <p class="description">
+            Keep your Cash Online Store profile up to date.
+            Update your name, email and profile picture.
+        </p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="flash-message {{ category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endwith %}
+
+        <form method="POST"
+              action="{{ url_for('edit_account') }}"
+              enctype="multipart/form-data">
+
+            <div class="profile-preview">
+
+                {% if user.profile_image %}
+                    <img
+                        src="{{ url_for('static', filename='uploads/' + user.profile_image) }}"
+                        alt="Profile Picture"
+                    >
+                {% else %}
+                    <div class="profile-placeholder">👤</div>
+                {% endif %}
+
+                <p>Current Profile Picture</p>
+
+            </div>
+
+            <label for="name">Full Name</label>
+
+            <input
+                type="text"
+                id="name"
+                name="name"
+                value="{{ user.name }}"
+                placeholder="Enter your full name"
+                required
+            >
+
+            <label for="email">Email Address</label>
+
+            <input
+                type="email"
+                id="email"
+                name="email"
+                value="{{ user.email }}"
+                placeholder="Enter your email address"
+                required
+            >
+
+            <label for="profile_image">Change Profile Picture</label>
+
+            <input
+                type="file"
+                id="profile_image"
+                name="profile_image"
+                class="file-upload"
+                accept=".jpg,.jpeg,.png,.webp,.gif"
+            >
+
+            <p class="file-note">
+                Supported formats: JPG, JPEG, PNG, WEBP and GIF.
+            </p>
+
+            <button type="submit" class="save-button">
+                Save Changes
+            </button>
+
+        </form>
+
+        <a href="{{ url_for('account') }}" class="back-link">
+            ← Back to My Account
+        </a>
+
+    </div>
+
+</body>
+</html>

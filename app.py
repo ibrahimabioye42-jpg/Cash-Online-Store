@@ -10,10 +10,12 @@ from urllib.parse import urlparse
 from werkzeug.security import (
     generate_password_hash,
     check_password_hash,
+
 )
 import uuid
 from werkzeug.utils import secure_filename
 from flask import flash,jsonify
+
 
 import os
 import requests
@@ -53,6 +55,23 @@ def get_db_connection():
     connection = sqlite3.connect(DATABASE)
     connection.row_factory = sqlite3.Row
     return connection
+
+def allowed_file(filename):
+    ALLOWED_EXTENSIONS = {
+        "jpg", "jpeg", "png", "webp", "gif"
+    }
+
+    return (
+        "." in filename
+        and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+    )
+
+# Profile and product image upload folder
+app.config["UPLOAD_FOLDER"] = os.path.join(
+    BASE_DIR, "static", "uploads"
+)
+
+os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
 @app.context_processor
 def inject_unread_messages():
@@ -451,6 +470,39 @@ def home():
         search=search,
         selected_category=category
     )
+@app.route("/categories")
+def categories():
+    connection = get_db_connection()
+
+    try:
+        category_rows = connection.execute("""
+            SELECT DISTINCT category
+            FROM products
+            WHERE quantity > 0
+              AND category IS NOT NULL
+              AND TRIM(category) != ''
+            ORDER BY category ASC
+        """).fetchall()
+
+        category_list = [
+            row["category"] for row in category_rows
+        ]
+
+        products = connection.execute("""
+            SELECT id, name, category, price, quantity, image
+            FROM products
+            WHERE quantity > 0
+            ORDER BY created_at DESC
+        """).fetchall()
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "categories.html",
+        categories=category_list,
+        products=products
+    )
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -532,6 +584,168 @@ def account():
         user=user,
         order_count=order_count
     )
+
+@app.route("/account/edit", methods=["GET", "POST"])
+def edit_account():
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    connection = get_db_connection()
+
+    try:
+        user = connection.execute("""
+            SELECT id, name, email, profile_image
+            FROM users
+            WHERE id = ?
+        """, (session["user_id"],)).fetchone()
+
+        if user is None:
+            session.clear()
+            return redirect(url_for("login"))
+
+        if request.method == "POST":
+
+            name = request.form.get("name", "").strip()
+            email = request.form.get("email", "").strip().lower()
+
+            image = request.files.get("profile_image")
+            profile_image = user["profile_image"]
+
+            # Validate name and email
+            if not name or not email:
+                flash("Name and email are required.", "error")
+
+            else:
+
+                # Check whether another user already uses this email
+                existing_email = connection.execute("""
+                    SELECT id FROM users
+                    WHERE email = ? AND id != ?
+                """, (email, session["user_id"])).fetchone()
+
+                if existing_email:
+                    flash("This email address is already in use.", "error")
+
+                else:
+
+                    # Process profile picture if provided
+                    if image and image.filename:
+
+                        if not allowed_file(image.filename):
+                            flash(
+                                "Invalid image format. Use JPG, JPEG, PNG, WEBP or GIF.",
+                                "error"
+                            )
+
+                            return render_template(
+                                "edit_account.html",
+                                user=user
+                            )
+
+                        else:
+                            filename = secure_filename(image.filename)
+
+                            unique_filename = (
+                                f"profile_{session['user_id']}_{filename}"
+                            )
+
+                            upload_path = os.path.join(
+                                app.config["UPLOAD_FOLDER"],
+                                unique_filename
+                            )
+
+                            image.save(upload_path)
+
+                            profile_image = unique_filename
+
+                    # Update user information
+                    connection.execute("""
+                        UPDATE users
+                        SET name = ?,
+                            email = ?,
+                            profile_image = ?
+                        WHERE id = ?
+                    """, (
+                        name,
+                        email,
+                        profile_image,
+                        session["user_id"]
+                    ))
+
+                    connection.commit()
+
+                    session["user_name"] = name
+
+                    flash(
+                        "Your profile has been updated successfully.",
+                        "success"
+                    )
+
+                    return redirect(url_for("account"))
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "edit_account.html",
+        user=user
+    )
+
+@app.route("/account/change-password", methods=["GET", "POST"])
+def change_password():
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+
+        current_password = request.form.get("current_password", "")
+        new_password = request.form.get("new_password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        connection = get_db_connection()
+
+        try:
+            user = connection.execute("""
+                SELECT password_hash
+                FROM users
+                WHERE id = ?
+            """, (session["user_id"],)).fetchone()
+
+            if user is None:
+                session.clear()
+                return redirect(url_for("login"))
+
+            if not check_password_hash(
+                user["password_hash"], current_password
+            ):
+                flash("Your current password is incorrect.", "error")
+
+            elif len(new_password) < 8:
+                flash("New password must be at least 8 characters.", "error")
+
+            elif new_password != confirm_password:
+                flash("New passwords do not match.", "error")
+
+            else:
+                new_password_hash = generate_password_hash(new_password)
+
+                connection.execute("""
+                    UPDATE users
+                    SET password_hash = ?
+                    WHERE id = ?
+                """, (new_password_hash, session["user_id"]))
+
+                connection.commit()
+
+                flash("Your password has been changed successfully.", "success")
+                return redirect(url_for("account"))
+
+        finally:
+            connection.close()
+
+    return render_template("change_password.html")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():

@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Categories | Cash Online Store</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f1f1f1;
+            color: #333;
+        }
+
+        header {
+            background: white;
+            padding: 18px;
+            border-bottom: 1px solid #eee;
+        }
+
+        header a {
+            color: #222;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .categories-container {
+            display: flex;
+            min-height: calc(100vh - 65px);
+        }
+
+        /* LEFT CATEGORY MENU */
+        .category-sidebar {
+            width: 125px;
+            background: white;
+            border-right: 1px solid #eee;
+            flex-shrink: 0;
+        }
+
+        .category-sidebar button {
+            display: block;
+            width: 100%;
+            min-height: 85px;
+            padding: 15px 7px;
+            text-align: center;
+            background: white;
+            border: none;
+            border-bottom: 1px solid #eee;
+            color: #333;
+            font-size: 12px;
+            cursor: pointer;
+            overflow-wrap: anywhere;
+        }
+
+        .category-sidebar button.active {
+            border-left: 5px solid #f68b1e;
+            background: #f5f5f5;
+            font-weight: bold;
+        }
+
+        .category-sidebar button:hover {
+            color: #f68b1e;
+        }
+
+        /* RIGHT CONTENT */
+        .category-content {
+            flex: 1;
+            padding: 12px;
+            min-width: 0;
+        }
+
+        .category-heading {
+            background: white;
+            padding: 18px;
+            border-radius: 5px;
+            margin-bottom: 12px;
+        }
+
+        .category-heading h2 {
+            margin: 0;
+            font-size: 19px;
+        }
+
+        .category-heading p {
+            font-size: 13px;
+            color: #777;
+            margin-bottom: 0;
+        }
+
+        /* PRODUCT GRID */
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 5px;
+            overflow: hidden;
+            text-decoration: none;
+            color: #333;
+            padding-bottom: 12px;
+        }
+
+        .product-card img {
+            width: 100%;
+            height: 105px;
+            object-fit: contain;
+            background: #f5f5f5;
+            padding: 8px;
+        }
+
+        .product-card h3 {
+            font-size: 12px;
+            font-weight: normal;
+            margin: 9px 7px;
+            line-height: 1.4;
+        }
+
+        .product-price {
+            display: block;
+            margin: 0 7px;
+            color: #e87916;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .empty-message {
+            background: white;
+            padding: 25px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .product-card[hidden] {
+            display: none;
+        }
+
+        @media (min-width: 700px) {
+            .category-sidebar {
+                width: 190px;
+            }
+
+            .category-sidebar button {
+                font-size: 14px;
+                min-height: 75px;
+            }
+
+            .product-grid {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+
+            .product-card img {
+                height: 160px;
+            }
+
+            .product-card h3 {
+                font-size: 14px;
+            }
+
+            .product-price {
+                font-size: 15px;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .category-sidebar {
+                width: 105px;
+            }
+
+            .category-content {
+                padding: 8px;
+            }
+
+            .product-grid {
+                gap: 7px;
+            }
+
+            .product-card img {
+                height: 85px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <a href="{{ url_for('home') }}">← Cash Online Store</a>
+</header>
+
+<main class="categories-container">
+
+    <!-- LEFT CATEGORY SIDEBAR -->
+    <aside class="category-sidebar">
+
+        <button type="button"
+                class="active"
+                data-category="all">
+            🛍️<br>
+            All Products
+        </button>
+
+        {% for category in categories %}
+
+            <button type="button"
+                    data-category="{{ category|lower }}">
+                {{ category }}
+            </button>
+
+        {% endfor %}
+
+    </aside>
+
+
+    <!-- RIGHT CATEGORY CONTENT -->
+    <section class="category-content">
+
+        <div class="category-heading">
+
+            <h2 id="category-title">All Products</h2>
+
+            <p id="product-count">
+                {{ products|length }} products available
+            </p>
+
+        </div>
+
+
+        {% if products %}
+
+            <div class="product-grid" id="product-grid">
+
+                {% for product in products %}
+
+                    <a class="product-card"
+                       href="{{ url_for('product_detail', product_id=product['id']) }}"
+                       data-category="{{ (product['category'] or '')|lower }}">
+
+                        {% if product['image'] %}
+
+                            <img src="{{ product['image'] }}"
+                                 alt="{{ product['name'] }}"
+                                 loading="lazy">
+
+                        {% else %}
+
+                            <img src="{{ url_for('static', filename='images/no-image.png') }}"
+                                 alt="Product image unavailable"
+                                 loading="lazy">
+
+                        {% endif %}
+
+                        <h3>{{ product['name'] }}</h3>
+
+                        <span class="product-price">
+                            GH₵ {{ "%.2f"|format(product['price']) }}
+                        </span>
+
+                    </a>
+
+                {% endfor %}
+
+            </div>
+
+        {% else %}
+
+            <div class="empty-message">
+                <h3>No products available yet.</h3>
+                <p>Products will appear here when sellers list them.</p>
+            </div>
+
+        {% endif %}
+
+
+        <div class="empty-message"
+             id="no-category-products"
+             hidden>
+
+            <h3>No products in this category yet.</h3>
+
+            <p>Try selecting another category.</p>
+
+        </div>
+
+    </section>
+
+</main>
+
+
+<!-- CATEGORY SWITCHING JAVASCRIPT -->
+<script>
+
+    const categoryButtons =
+        document.querySelectorAll(".category-sidebar button");
+
+    const productCards =
+        document.querySelectorAll(".product-card");
+
+    const categoryTitle =
+        document.getElementById("category-title");
+
+    const productCount =
+        document.getElementById("product-count");
+
+    const emptyMessage =
+        document.getElementById("no-category-products");
+
+
+    categoryButtons.forEach(button => {
+
+        button.addEventListener("click", function() {
+
+            const selectedCategory =
+                this.dataset.category;
+
+            let visibleProducts = 0;
+
+            // Highlight selected category
+            categoryButtons.forEach(item => {
+                item.classList.remove("active");
+            });
+
+            this.classList.add("active");
+
+
+            // Update heading
+            categoryTitle.textContent =
+                selectedCategory === "all"
+                ? "All Products"
+                : this.textContent.trim();
+
+
+            // Filter products
+            productCards.forEach(product => {
+
+                const productCategory =
+                    product.dataset.category;
+
+                const matches =
+                    selectedCategory === "all" ||
+                    productCategory === selectedCategory;
+
+                product.hidden = !matches;
+
+                if (matches) {
+                    visibleProducts++;
+                }
+
+            });
+
+
+            // Update product count
+            productCount.textContent =
+                visibleProducts + " product(s) available";
+
+
+            // Show empty message when needed
+            emptyMessage.hidden = visibleProducts > 0;
+
+        });
+
+    });
+
+</script>
+
+</body>
+</html>

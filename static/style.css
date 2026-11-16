@@ -4017,3 +4017,33 @@ input:focus-visible {
 .account-icon {
     font-size: 22px;
 }
+.account-profile-header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 25px;
+}
+
+.account-profile-image,
+.account-profile-placeholder {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.account-profile-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #eeeeee;
+    font-size: 35px;
+}
+
+.account-profile-header h2 {
+    margin-bottom: 5px;
+}
+
+.account-profile-header p {
+    margin-top: 0;
+}
