@@ -27,6 +27,19 @@ import uuid
 from datetime import datetime, date
 PAYSTACK_SECRET_KEY = os.getenv("PAYSTACK_SECRET_KEY")
 
+import secrets
+import hashlib
+import smtplib
+from email.message import EmailMessage
+from datetime import timedelta
+
+# Email OTP configuration
+MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+MAIL_PORT = int(os.getenv("MAIL_PORT", "587"))
+MAIL_USERNAME = os.getenv("MAIL_USERNAME")
+MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
+MAIL_SENDER = os.getenv("MAIL_SENDER", MAIL_USERNAME)
+
 app = Flask(__name__)
 app.secret_key = os.environ.get(
     "FLASK_SECRET_KEY",
@@ -50,6 +63,170 @@ MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app.config["MAX_CONTENT_LENGTH"] = MAX_IMAGE_SIZE
+
+def send_otp_email(receiver_email, otp):
+    message = EmailMessage()
+
+    message["Subject"] = "Verify Your Cash Online Store Account"
+    message["From"] = MAIL_SENDER
+    message["To"] = receiver_email
+
+    message.set_content(f"""
+Hello,
+
+Welcome to Cash Online Store!
+
+Your email verification code is:
+
+{otp}
+
+This code will expire in 10 minutes.
+
+If you did not request this code, please ignore this email.
+
+Thank you,
+Cash Online Store
+""")
+
+    try:
+        with smtplib.SMTP(MAIL_SERVER, MAIL_PORT) as server:
+            server.starttls()
+            server.login(MAIL_USERNAME, MAIL_PASSWORD)
+            server.send_message(message)
+
+        return True
+
+    except Exception as error:
+        print("Email sending failed:", error)
+        return False
+
+def generate_and_send_otp(email):
+    # Generate a random four-digit OTP
+    otp = f"{secrets.randbelow(10000):04d}"
+
+    # Hash the OTP before saving it
+    otp_hash = hashlib.sha256(
+        otp.encode("utf-8")
+    ).hexdigest()
+
+    now = datetime.utcnow()
+    expires_at = now + timedelta(minutes=10)
+
+    connection = get_db_connection()
+
+    try:
+        connection.execute("""
+            INSERT INTO email_verifications
+            (email, otp_hash, expires_at, attempts, created_at)
+            VALUES (?, ?, ?, 0, ?)
+            ON CONFLICT(email) DO UPDATE SET
+                otp_hash = excluded.otp_hash,
+                expires_at = excluded.expires_at,
+                attempts = 0,
+                created_at = excluded.created_at
+        """, (
+            email,
+            otp_hash,
+            expires_at.isoformat(),
+            now.isoformat()
+        ))
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+    # Send OTP to the user's email
+    if not send_otp_email(email, otp):
+
+        connection = get_db_connection()
+
+        try:
+            connection.execute("""
+                DELETE FROM email_verifications
+                WHERE email = ?
+            """, (email,))
+
+            connection.commit()
+
+        finally:
+            connection.close()
+
+        return False
+
+    return True
+
+
+def verify_email_otp(email, entered_otp):
+    connection = get_db_connection()
+
+    try:
+        verification = connection.execute("""
+            SELECT otp_hash, expires_at, attempts
+            FROM email_verifications
+            WHERE email = ?
+        """, (email,)).fetchone()
+
+        if verification is None:
+            return False, "No verification code found. Please request a new one."
+
+        # Check OTP expiry
+        if datetime.utcnow() > datetime.fromisoformat(
+            verification["expires_at"]
+        ):
+            connection.execute("""
+                DELETE FROM email_verifications
+                WHERE email = ?
+            """, (email,))
+
+            connection.commit()
+
+            return False, "Your code has expired. Please request a new one."
+
+        # Limit incorrect attempts
+        if verification["attempts"] >= 5:
+            connection.execute("""
+                DELETE FROM email_verifications
+                WHERE email = ?
+            """, (email,))
+
+            connection.commit()
+
+            return False, "Too many attempts. Please request a new code."
+
+        # Compare entered OTP with stored hash
+        entered_hash = hashlib.sha256(
+            entered_otp.encode("utf-8")
+        ).hexdigest()
+
+        if not secrets.compare_digest(
+            entered_hash,
+            verification["otp_hash"]
+        ):
+            connection.execute("""
+                UPDATE email_verifications
+                SET attempts = attempts + 1
+                WHERE email = ?
+            """, (email,))
+
+            connection.commit()
+
+            return False, "Incorrect verification code."
+
+        # Delete OTP after successful verification
+        connection.execute("""
+            DELETE FROM email_verifications
+            WHERE email = ?
+        """, (email,))
+
+        connection.commit()
+
+        return True, "Email verified successfully."
+
+    finally:
+        connection.close()
+    
+            
 
 def get_db_connection():
     connection = sqlite3.connect(DATABASE)
@@ -159,6 +336,17 @@ def init_db():
             FOREIGN KEY (seller_id) REFERENCES users(id)
         )
     """)
+
+    connection.execute("""
+    CREATE TABLE IF NOT EXISTS email_verifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL UNIQUE,
+        otp_hash TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+    )
+""")
     # Add is_hidden column to existing products table if it doesn't exist
     product_columns = connection.execute(
         "PRAGMA table_info(products)"
@@ -507,27 +695,154 @@ def categories():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     error = None
-    success = None
+
     next_url = safe_next_url(
-    request.args.get("next") or request.form.get("next")
-)
+        request.args.get("next") or request.form.get("next")
+    )
 
     if request.method == "POST":
-        name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "")
-        role = request.form.get("role", "").strip().lower()
 
-        if not name or not email or not password:
-            error = "Please complete all required fields."
-        elif len(password) < 8:
-            error = "Your password must be at least 8 characters."
-        elif role not in ("buyer", "seller"):
-            error = "Please select a valid account type."
+        if not email or "@" not in email or "." not in email.split("@")[-1]:
+            error = "Please enter a valid email address."
         else:
             connection = get_db_connection()
             try:
-                connection.execute("""
+                existing_user = connection.execute("""
+                    SELECT id FROM users WHERE email = ?
+                """, (email,)).fetchone()
+
+                existing_otp = connection.execute("""
+                    SELECT created_at FROM email_verifications
+                    WHERE email = ?
+                """, (email,)).fetchone()
+            finally:
+                connection.close()
+
+            if existing_user:
+                error = "This email is already registered. Please log in."
+
+            elif existing_otp:
+                created_at = datetime.fromisoformat(
+                    existing_otp["created_at"]
+                )
+
+                if (datetime.utcnow() - created_at).total_seconds() < 60:
+                    error = "Please wait one minute before requesting another code."
+
+            if not error:
+                if generate_and_send_otp(email):
+                    session["pending_registration_email"] = email
+                    session["pending_registration_next"] = next_url
+
+                    return redirect(url_for("verify_registration"))
+
+                error = "We couldn't send your verification code. Please check your email settings and try again."
+
+    return render_template(
+        "register.html",
+        error=error,
+        next_url=next_url
+    )
+
+
+@app.route("/register/verify", methods=["GET", "POST"])
+def verify_registration():
+    email = session.get("pending_registration_email")
+
+    if not email:
+        return redirect(url_for("register"))
+
+    error = None
+
+    if request.method == "POST":
+        otp = request.form.get("otp", "").strip()
+
+        if not otp.isdigit() or len(otp) != 4:
+            error = "Please enter your four-digit verification code."
+        else:
+            valid, message = verify_email_otp(email, otp)
+
+            if valid:
+                session["registration_email_verified"] = True
+                return redirect(url_for("complete_registration"))
+
+            error = message
+
+    return render_template(
+        "verify_email.html",
+        email=email,
+        error=error
+    )
+
+
+@app.route("/register/resend", methods=["POST"])
+def resend_registration_otp():
+    email = session.get("pending_registration_email")
+
+    if not email:
+        return redirect(url_for("register"))
+
+    connection = get_db_connection()
+    try:
+        existing_otp = connection.execute("""
+            SELECT created_at FROM email_verifications
+            WHERE email = ?
+        """, (email,)).fetchone()
+    finally:
+        connection.close()
+
+    if existing_otp:
+        created_at = datetime.fromisoformat(
+            existing_otp["created_at"]
+        )
+
+        if (datetime.utcnow() - created_at).total_seconds() < 60:
+            flash("Please wait one minute before requesting another code.", "error")
+            return redirect(url_for("verify_registration"))
+
+    if generate_and_send_otp(email):
+        flash("A new verification code has been sent to your email.", "success")
+    else:
+        flash("We couldn't send a new code. Please try again.", "error")
+
+    return redirect(url_for("verify_registration"))
+
+
+@app.route("/register/details", methods=["GET", "POST"])
+def complete_registration():
+    email = session.get("pending_registration_email")
+
+    # Make sure the email has been verified
+    if not email or not session.get("registration_email_verified"):
+        return redirect(url_for("register"))
+
+    error = None
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        password = request.form.get("password", "")
+        role = request.form.get("role", "").strip().lower()
+
+        # Validate registration details
+        if not name or not password:
+            error = "Please complete all required fields."
+
+        elif len(name) > 100:
+            error = "Your name must not exceed 100 characters."
+
+        elif len(password) < 8:
+            error = "Your password must be at least 8 characters."
+
+        elif role not in ("buyer", "seller"):
+            error = "Please select a valid account type."
+
+        else:
+            connection = get_db_connection()
+
+            try:
+                # Create the new user account
+                cursor = connection.execute("""
                     INSERT INTO users
                     (name, email, password_hash, role)
                     VALUES (?, ?, ?, ?)
@@ -537,18 +852,39 @@ def register():
                     generate_password_hash(password),
                     role
                 ))
+
                 connection.commit()
-                success = "Account created successfully! You can now log in."
+
+                # Get the newly created user's ID
+                new_user_id = cursor.lastrowid
+
+                # Clear any previous login session
+                session.clear()
+
+                # Automatically log in the new user
+                session["user_id"] = new_user_id
+                session["user_name"] = name
+                session["user_role"] = role
+
+                flash(
+                    "Welcome to Cash Online Store! "
+                    "Your account has been created successfully.",
+                    "success"
+                )
+
+                return redirect(url_for("home"))
+
             except sqlite3.IntegrityError:
-                error = "That email address is already registered."
+                connection.rollback()
+                error = "This email is already registered. Please log in."
+
             finally:
                 connection.close()
 
     return render_template(
-        "register.html",
-        error=error,
-        success=success,
-        next_url=next_url
+        "complete_registration.html",
+        email=email,
+        error=error
     )
 
 @app.route("/account")

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Email | Cash Online Store</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f6fa;
+            color: #222;
+        }
+
+        .navbar {
+            background: white;
+            padding: 18px 7%;
+            border-bottom: 1px solid #eee;
+        }
+
+        .logo {
+            color: #222;
+            font-size: 21px;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .logo span {
+            background: #f68b1e;
+            color: white;
+            padding: 8px 11px;
+            border-radius: 7px;
+            margin-right: 7px;
+        }
+
+        .container {
+            width: 92%;
+            max-width: 440px;
+            background: white;
+            margin: 55px auto;
+            padding: 35px 28px;
+            border-radius: 10px;
+            box-shadow: 0 3px 15px rgba(0,0,0,.06);
+            text-align: center;
+        }
+
+        h2 {
+            font-size: 24px;
+        }
+
+        p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .email {
+            color: #222;
+            font-weight: bold;
+            overflow-wrap: anywhere;
+        }
+
+        .otp-input {
+            width: 100%;
+            padding: 15px;
+            margin-top: 20px;
+            text-align: center;
+            font-size: 25px;
+            letter-spacing: 12px;
+            border: 1px solid #ccc;
+            border-radius: 7px;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #f68b1e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 22px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: blue;
+        }
+
+        .error {
+            color: #c62828;
+            background: #fff0f0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .flash {
+            padding: 10px;
+            border-radius: 5px;
+            background: #fff4e5;
+            color: #8a4b08;
+            margin-bottom: 12px;
+        }
+
+        .resend {
+            margin-top: 22px;
+        }
+
+        .resend button {
+            background: transparent;
+            color: blue;
+            border: none;
+            padding: 5px;
+            margin: 0;
+            width: auto;
+        }
+    </style>
+</head>
+
+<body>
+
+<header class="navbar">
+    <a class="logo" href="{{ url_for('home') }}">
+        <span>C</span> Cash Online Store
+    </a>
+</header>
+
+<main class="container">
+
+    <h2>Verify your email</h2>
+
+    <p>
+        We've sent a four-digit verification code to:
+    </p>
+
+    <p class="email">{{ email }}</p>
+
+    <p>Enter the code below to continue.</p>
+
+    {% if error %}
+        <p class="error" role="alert">{{ error }}</p>
+    {% endif %}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <p class="flash" role="status">{{ message }}</p>
+        {% endfor %}
+    {% endwith %}
+
+    <form method="POST"
+          action="{{ url_for('verify_registration') }}">
+
+        <input
+            type="text"
+            name="otp"
+            class="otp-input"
+            placeholder="0000"
+            maxlength="4"
+            minlength="4"
+            pattern="[0-9]{4}"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            required
+        >
+
+        <button type="submit">Verify Email</button>
+
+    </form>
+
+    <div class="resend">
+        <p>Didn't receive your code?</p>
+
+        <form method="POST"
+              action="{{ url_for('resend_registration_otp') }}">
+
+            <button type="submit">Resend Code</button>
+
+        </form>
+    </div>
+
+</main>
+
+</body>
+</html>

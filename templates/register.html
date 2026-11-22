@@ -3,87 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register | Cash Online Store</title>
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='style.css') }}">
+    <title>Join Cash Online Store</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f6fa;
+            color: #222;
+        }
+
+        .navbar {
+            background: white;
+            padding: 18px 7%;
+            border-bottom: 1px solid #eee;
+        }
+
+        .logo {
+            color: #222;
+            font-size: 21px;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .logo span {
+            background: blue;
+            color: white;
+            padding: 8px 11px;
+            border-radius: 7px;
+            margin-right: 7px;
+        }
+
+        .container {
+            width: 92%;
+            max-width: 440px;
+            background: white;
+            margin: 55px auto;
+            padding: 35px 28px;
+            border-radius: 10px;
+            box-shadow: 0 3px 15px rgba(0,0,0,.06);
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 25px;
+        }
+
+        p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        label {
+            display: block;
+            margin: 22px 0 8px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 15px;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: blue;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 22px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: blue;
+        }
+
+        .error {
+            color: #c62828;
+            background: #fff0f0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .login {
+            text-align: center;
+            margin-top: 22px;
+        }
+
+        .login a {
+            color: blue;
+            text-decoration: none;
+            font-weight: bold;
+        }
+    </style>
 </head>
+
 <body>
 
 <header class="navbar">
     <a class="logo" href="{{ url_for('home') }}">
-        <span class="logo-icon">C</span>
-        Cash Online Store
+        <span>C</span> Cash Online Store
     </a>
 </header>
 
-<main class="section">
-    <div class="account-note">
-        <h2>Create your account</h2>
-        <p>Join Cash Online Store to shop or sell products.</p>
+<main class="container">
 
-        {% if error %}
-    <p role="alert" style="color: #c62828;">
-        {{ error }}
+    <h2>Welcome!</h2>
+
+    <p>
+        Create your Cash Online Store account and enjoy
+        shopping from different sellers.
     </p>
-{% endif %}
 
-{% if success %}
-    <p role="status" style="color: #16663c;">
-        {{ success }}
-    </p>
-{% endif %}
+    {% if error %}
+        <p class="error" role="alert">{{ error }}</p>
+    {% endif %}
 
-        <form action="{{ url_for('register') }}" method="POST">
-            <div style="margin-bottom: 16px;">
-                <input type="hidden" name="next" value="{{ next_url or '' }}">
-                <label for="name">Full name</label>
-                <input id="name" name="name" type="text"
-                       autocomplete="name" required
-                       style="display:block;width:100%;padding:12px;
-                       margin-top:6px;border:1px solid #e4eaf2;
-                       border-radius:8px;">
-            </div>
+    <form method="POST" action="{{ url_for('register') }}">
 
-            <div style="margin-bottom: 16px;">
-                <label for="email">Email address</label>
-                <input id="email" name="email" type="email"
-                       autocomplete="email" required
-                       style="display:block;width:100%;padding:12px;
-                       margin-top:6px;border:1px solid #e4eaf2;
-                       border-radius:8px;">
-            </div>
+        <input type="hidden" name="next"
+               value="{{ next_url or '' }}">
 
-            <div style="margin-bottom: 16px;">
-                <label for="password">Password</label>
-                <input id="password" name="password" type="password"
-                       autocomplete="new-password"
-                       minlength="8" required
-                       style="display:block;width:100%;padding:12px;
-                       margin-top:6px;border:1px solid #e4eaf2;
-                       border-radius:8px;">
-            </div>
+        <label for="email">Enter your email address</label>
 
-            <div style="margin-bottom: 20px;">
-                <label for="role">Account type</label>
-                <select id="role" name="role" required
-                        style="display:block;width:100%;padding:12px;
-                        margin-top:6px;border:1px solid #e4eaf2;
-                        border-radius:8px;">
-                    <option value="buyer">Buyer</option>
-                    <option value="seller">Seller</option>
-                </select>
-            </div>
+        <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="example@gmail.com"
+            autocomplete="email"
+            required
+        >
 
-            <button class="primary-button" type="submit">
-                Create Account
-            </button>
-        </form>
+        <button type="submit">Continue</button>
 
-        <p>
-    Already registered?
-    <a href="{{ url_for('login') }}">Login here</a>.
-</p>
+    </form>
+
+    <div class="login">
+        Already have an account?
+        <a href="{{ url_for('login') }}">Login</a>
     </div>
+
 </main>
 
 </body>
