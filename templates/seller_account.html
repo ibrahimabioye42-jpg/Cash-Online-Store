@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>My Seller Account | Cash Online Store</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+    <style>
+        .seller-account {
+            max-width: 700px;
+            margin: 35px auto;
+            padding: 20px;
+        }
+
+        .account-profile {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .account-avatar {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-bottom: 12px;
+        }
+
+        .account-links {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 18px;
+        }
+
+        .account-links h3 {
+            margin-bottom: 12px;
+        }
+
+        .account-links a {
+            display: block;
+            padding: 13px 5px;
+            color: inherit;
+            text-decoration: none;
+            border-bottom: 1px solid #eee;
+        }
+
+        .account-links a:last-child {
+            border-bottom: none;
+        }
+
+        .account-links a:hover {
+            color: #087f5b;
+        }
+
+        .account-summary {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .summary-card {
+            background: white;
+            padding: 18px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .summary-card h3 {
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .summary-card p {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .logout-button {
+            width: 100%;
+            padding: 13px;
+            border: none;
+            border-radius: 8px;
+            background: #dc3545;
+            color: white;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        @media (max-width: 500px) {
+            .seller-account {
+                margin: 15px auto;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header class="navbar">
+    <a class="logo" href="{{ url_for('home') }}">
+        <span class="logo-icon">C</span>
+        Cash Online Store
+    </a>
+</header>
+
+<main class="seller-account">
+
+    <!-- SELLER PROFILE -->
+    <section class="account-profile">
+
+        {% if user["profile_image"] %}
+            <img class="account-avatar"
+                 src="{{ user['profile_image'] }}"
+                 alt="Seller Profile">
+        {% else %}
+            <div class="account-avatar"
+                 style="background:#087f5b; color:white;
+                        display:inline-flex; align-items:center;
+                        justify-content:center; font-size:35px;">
+                {{ user["name"][0]|upper }}
+            </div>
+        {% endif %}
+
+        <h2>{{ user["name"] }}</h2>
+        <p>{{ user["email"] }}</p>
+
+        <p><strong>Seller Account</strong></p>
+
+        <a href="{{ url_for('edit_seller_profile') }}">
+            Edit Profile and Shop Information
+        </a>
+
+    </section>
+
+
+    <!-- BUSINESS SUMMARY -->
+    <section class="account-summary">
+
+        <div class="summary-card">
+            <h3>Products Listed</h3>
+            <p>{{ product_count }}</p>
+        </div>
+
+        <div class="summary-card">
+            <h3>Total Orders</h3>
+            <p>{{ stats["total_orders"] }}</p>
+        </div>
+
+        <div class="summary-card">
+            <h3>Paid Orders</h3>
+            <p>{{ stats["paid_orders"] }}</p>
+        </div>
+
+        <div class="summary-card">
+            <h3>Total Revenue</h3>
+            <p>GH₵ {{ "%.2f"|format(stats["total_revenue"]) }}</p>
+        </div>
+
+    </section>
+
+
+    <!-- MY SHOP -->
+    <section class="account-links">
+
+        <h3>MY SHOP</h3>
+
+        <a href="{{ url_for('seller_dashboard') }}">
+            My Seller Dashboard
+        </a>
+
+        <a href="{{ url_for('add_product') }}">
+            Add New Product
+        </a>
+
+        <a href="{{ url_for('seller_profile',
+                            seller_id=session['user_id']) }}">
+            View My Public Shop
+        </a>
+
+        <a href="{{ url_for('seller_analytics') }}">
+            Seller Analytics
+        </a>
+
+        <a href="{{ url_for('seller_orders') }}">
+            My Orders
+        </a>
+
+        <a href="{{ url_for('notifications') }}">
+            Notifications
+        </a>
+
+        <a href="{{ url_for('messages') }}">
+            Messages
+        </a>
+
+    </section>
+
+
+    <!-- SUBSCRIPTION -->
+    <section class="account-links">
+
+        <h3>MY SUBSCRIPTION</h3>
+
+        <p>
+            Current Plan:
+            <strong>{{ plan_name }}</strong>
+        </p>
+
+        <p>
+            Product Allowance:
+            <strong>
+                {% if product_limit is none %}
+                    Unlimited
+                {% else %}
+                    {{ product_limit }} products
+                {% endif %}
+            </strong>
+        </p>
+
+        {% if subscription_expiry %}
+            <p>
+                Subscription Expires:
+                <strong>{{ subscription_expiry }}</strong>
+            </p>
+        {% else %}
+            <p>Your account is currently on the Free plan.</p>
+        {% endif %}
+
+        <a href="{{ url_for('subscription') }}">
+            Manage Subscription / Upgrade Plan
+        </a>
+
+    </section>
+
+
+    <!-- ACCOUNT SETTINGS -->
+    <section class="account-links">
+
+        <h3>ACCOUNT SETTINGS</h3>
+
+        <a href="{{ url_for('edit_seller_profile') }}">
+            Personal and Shop Information
+        </a>
+
+        <a href="{{ url_for('change_password') }}">
+            Change Password
+        </a>
+
+    </section>
+
+
+    <!-- LOGOUT -->
+    <form method="POST" action="{{ url_for('logout') }}">
+        <button type="submit" class="logout-button">
+            Logout
+        </button>
+    </form>
+
+    <p style="text-align:center; margin-top:20px;">
+        <a href="{{ url_for('home') }}">Return to Store</a>
+    </p>
+
+</main>
+
+</body>
+</html>

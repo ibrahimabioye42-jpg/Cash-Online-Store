@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Tracking | Admin</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+    <style>
+        .tracking-container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        .tracking-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .tracking-table-wrapper {
+            overflow-x: auto;
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+        }
+
+        .tracking-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 850px;
+        }
+
+        .tracking-table th,
+        .tracking-table td {
+            padding: 13px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .tracking-table th {
+            background: #f5f5f5;
+        }
+
+        .tracking-table td {
+            font-size: 14px;
+        }
+
+        .location-source {
+            padding: 5px 9px;
+            border-radius: 20px;
+            background: #e8f5e9;
+            color: #237a35;
+            font-size: 12px;
+        }
+
+        .no-location {
+            color: #888;
+        }
+
+        .back-link {
+            text-decoration: none;
+            padding: 10px 16px;
+            background: #222;
+            color: white;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="tracking-container">
+
+    <div class="tracking-header">
+        <div>
+            <h2>Customer Location Tracking</h2>
+            <p>View location information shared by customers.</p>
+        </div>
+
+        <a href="{{ url_for('admin_dashboard') }}"
+           class="back-link">
+            Back to Admin
+        </a>
+    </div>
+
+    <div class="tracking-table-wrapper">
+
+        <table class="tracking-table">
+
+            <thead>
+                <tr>
+                    <th>Customer</th>
+                    <th>Email</th>
+                    <th>Country</th>
+                    <th>Region</th>
+                    <th>Town / City</th>
+                    <th>Location Type</th>
+                    <th>Coordinates</th>
+                    <th>Date Recorded</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for customer in customers %}
+
+                <tr>
+                    <td>{{ customer.name }}</td>
+
+                    <td>{{ customer.email }}</td>
+
+                    <td>
+                        {{ customer.country or "Not available" }}
+                    </td>
+
+                    <td>
+                        {{ customer.region or "Not available" }}
+                    </td>
+
+                    <td>
+                        {{ customer.town or "Not available" }}
+                    </td>
+
+                    <td>
+                        {% if customer.location_source == "GPS" %}
+                            <span class="location-source">GPS</span>
+                        {% elif customer.location_source == "IP" %}
+                            <span class="location-source">IP Based</span>
+                        {% else %}
+                            <span class="no-location">
+                                Not shared
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                       {% if customer.location_source == "GPS"
+                        and customer.latitude is not none
+                         and customer.longitude is not none %}
+
+                       {{ "%.6f"|format(customer.latitude) }},
+                       {{ "%.6f"|format(customer.longitude) }}
+
+                    <br>
+
+    <a
+        href="https://www.google.com/maps?q={{ customer.latitude }},{{ customer.longitude }}"
+        target="_blank"
+        rel="noopener noreferrer">
+        View on Map
+    </a>
+
+         {% else %}
+          Not available
+          {% endif %}
+                    </td>
+
+                    <td>
+                        {{ customer.recorded_at or "Not available" }}
+                    </td>
+                </tr>
+
+                {% else %}
+
+                <tr>
+                    <td colspan="8">
+                        No customer records found.
+                    </td>
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+</body>
+</html>

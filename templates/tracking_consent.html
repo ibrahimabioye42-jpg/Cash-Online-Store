@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Your Privacy | Cash Online Store</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+    <style>
+        .tracking-container {
+            max-width: 550px;
+            margin: 50px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .tracking-container h1 {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+
+        .tracking-container .intro {
+            text-align: center;
+            color: #666;
+            margin-bottom: 25px;
+        }
+
+        .tracking-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .tracking-option input {
+            margin-top: 5px;
+            width: 18px;
+            height: 18px;
+            accent-color: #f28c28;
+        }
+
+        .tracking-option label {
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .tracking-option strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .tracking-option p {
+            color: #777;
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .tracking-button {
+            width: 100%;
+            padding: 15px;
+            margin-top: 25px;
+            border: none;
+            border-radius: 8px;
+            background: #f28c28;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .tracking-button:hover {
+            background: #dc791a;
+        }
+
+        .privacy-note {
+            text-align: center;
+            font-size: 13px;
+            color: #777;
+            margin-top: 18px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="tracking-container">
+
+    <h1>Your Privacy Matters</h1>
+
+    <p class="intro">
+        Help Cash Online Store improve your shopping experience.
+        Choose what information you are comfortable sharing.
+    </p>
+
+    <form method="POST"
+          action="{{ url_for('tracking_consent') }}">
+
+        <div class="tracking-option">
+            <input type="checkbox"
+                   name="activity_tracking"
+                   id="activity_tracking">
+
+            <label for="activity_tracking">
+                <strong>Activity Tracking</strong>
+                <p>
+                    Allow us to record your activity on Cash Online
+                    Store, including product views, searches and
+                    shopping interactions.
+                </p>
+            </label>
+        </div>
+
+        <div class="tracking-option">
+            <input type="checkbox"
+                   name="approximate_location"
+                   id="approximate_location">
+
+            <label for="approximate_location">
+                <strong>Approximate Location</strong>
+                <p>
+                    Allow us to estimate your country, region and
+                    town to improve local product recommendations.
+                </p>
+            </label>
+        </div>
+
+        <div class="tracking-option">
+            <input type="checkbox"
+                   name="precise_location"
+                   id="precise_location">
+
+            <label for="precise_location">
+                <strong>Precise GPS Location</strong>
+                <p>
+                    Allow us to request your device's GPS location
+                    when a location-based feature needs it.
+                    Your browser will ask for permission separately.
+                </p>
+            </label>
+        </div>
+
+        <button type="submit" class="tracking-button">
+            Save My Preferences & Continue
+        </button>
+
+    </form>
+
+    <p class="privacy-note">
+        You can change your tracking preferences later.
+        Declining optional tracking will not prevent you from
+        using Cash Online Store.
+    </p>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Seller Subscription | Cash Online Store</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+    <style>
+        .subscription-container {
+            max-width: 1100px;
+            margin: 45px auto;
+            padding: 20px;
+        }
+
+        .subscription-heading {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        .subscription-plans {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 22px;
+        }
+
+        .plan-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 14px;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .plan-card.premium {
+            border: 2px solid #d6a52c;
+        }
+
+        .plan-price {
+            font-size: 30px;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+
+        .plan-card ul {
+            list-style: none;
+            padding: 0;
+            line-height: 2.2;
+        }
+
+        .subscribe-btn {
+            display: block;
+            background: blue;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-decoration: none;
+            margin-top: 20px;
+        }
+
+        .current-plan {
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 9px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="subscription-container">
+
+    <a href="{{ url_for('seller_dashboard') }}"
+       class="back-link">
+         Back to Seller Dashboard
+    </a>
+
+    <div class="subscription-heading">
+        <h1>Choose Your Seller Plan</h1>
+        <p>
+            Grow your business and reach more customers
+            with Cash Online Store.
+        </p>
+    </div>
+
+    {% if current_subscription %}
+        <div class="current-plan">
+            <strong>Your current plan:</strong>
+            {{ current_subscription.plan|title }}
+
+            <br>
+
+            <strong>Expires:</strong>
+            {{ current_subscription.end_date }}
+        </div>
+    {% endif %}
+
+    <div class="subscription-plans">
+
+        {% for key, plan in plans.items() %}
+
+        <div class="plan-card {{ key }}">
+
+            <h2>{{ plan.name }}</h2>
+
+            <div class="plan-price">
+                GH₵{{ plan.price }}
+                <small>/month</small>
+            </div>
+
+            <ul>
+                {% if key == "regular" %}
+                    <li>Up to 20 products</li>
+                    <li>Standard product visibility</li>
+
+                {% elif key == "pro" %}
+                    <li>Up to 50 products</li>
+                    <li>Priority product visibility</li>
+
+                {% else %}
+                    <li>Unlimited products</li>
+                    <li>Highest product visibility</li>
+                {% endif %}
+
+                <li>Seller dashboard access</li>
+                <li>Monthly subscription</li>
+            </ul>
+
+            <form method="POST"
+              action="{{ url_for('initialize_subscription_payment', plan=key) }}">
+
+               <button type="submit" class="subscribe-btn">
+                   Subscribe to {{ plan.name }}
+               </button>
+
+            </form>
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+</div>
+
+</body>
+</html>

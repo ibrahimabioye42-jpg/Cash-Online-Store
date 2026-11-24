@@ -233,6 +233,127 @@ def get_db_connection():
     connection.row_factory = sqlite3.Row
     return connection
 
+def log_user_activity(user_id, activity_type, description=None, product_id=None):
+    if not user_id:
+        return
+    
+def record_approximate_location(user_id, ip_address):
+    if not user_id or not ip_address:
+        return
+
+    import ipaddress
+
+    try:
+        ip = ipaddress.ip_address(ip_address)
+
+        # Public IP addresses only
+        if not ip.is_global:
+            return
+
+        # Check customer's location permission
+        connection = get_db_connection()
+
+        try:
+            preferences = connection.execute("""
+                SELECT approximate_location
+                FROM user_tracking_preferences
+                WHERE user_id = ?
+            """, (user_id,)).fetchone()
+
+        finally:
+            connection.close()
+
+        if not preferences or preferences["approximate_location"] != 1:
+            return
+
+        # Request approximate location from IP geolocation provider
+        response = requests.get(
+            f"https://ipapi.co/{ip}/json/",
+            timeout=5
+        )
+
+        response.raise_for_status()
+        location = response.json()
+
+        if location.get("error"):
+            return
+
+        country = location.get("country_name")
+        region = location.get("region")
+        town = location.get("city")
+
+        if not any([country, region, town]):
+            return
+
+        connection = get_db_connection()
+
+        try:
+            connection.execute("""
+                INSERT INTO user_locations (
+                    user_id,
+                    country,
+                    region,
+                    town,
+                    latitude,
+                    longitude,
+                    accuracy,
+                    location_source,
+                    recorded_at
+                )
+                VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?)
+            """, (
+                user_id,
+                country,
+                region,
+                town,
+                "IP",
+                datetime.utcnow().isoformat()
+            ))
+
+            connection.commit()
+
+        finally:
+            connection.close()
+
+    except Exception as error:
+        print("Approximate location error:", error)
+    connection = get_db_connection()
+
+    try:
+        # Check whether the customer has enabled activity tracking
+        preferences = connection.execute("""
+            SELECT activity_tracking
+            FROM user_tracking_preferences
+            WHERE user_id = ?
+        """, (user_id,)).fetchone()
+
+        # Do not record activities without consent
+        if not preferences or preferences["activity_tracking"] != 1:
+            return
+
+        # Save the customer's activity
+        connection.execute("""
+            INSERT INTO user_activity_logs (
+                user_id,
+                activity_type,
+                description,
+                product_id,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            user_id,
+            activity_type,
+            description,
+            product_id,
+            datetime.utcnow().isoformat()
+        ))
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
 def allowed_file(filename):
     ALLOWED_EXTENSIONS = {
         "jpg", "jpeg", "png", "webp", "gif"
@@ -320,6 +441,7 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    
 
     # Add products and link each product to its seller.
     connection.execute("""
@@ -336,6 +458,8 @@ def init_db():
             FOREIGN KEY (seller_id) REFERENCES users(id)
         )
     """)
+    
+
 
     connection.execute("""
     CREATE TABLE IF NOT EXISTS email_verifications (
@@ -347,6 +471,9 @@ def init_db():
         created_at TEXT NOT NULL
     )
 """)
+    
+    
+
     # Add is_hidden column to existing products table if it doesn't exist
     product_columns = connection.execute(
         "PRAGMA table_info(products)"
@@ -516,7 +643,6 @@ def init_db():
     """) 
     
     # Add seller profile fields without deleting existing data
-    connection = get_db_connection()
 
     try:
         user_columns = [
@@ -537,21 +663,118 @@ def init_db():
                 ALTER TABLE users
                 ADD COLUMN shop_description TEXT
             """)
-            connection.execute("""
-    CREATE TABLE IF NOT EXISTS admin_users (
-        user_id INTEGER PRIMARY KEY,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    )
-""")
-            
-            
+
+        # Create admin users table
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS admin_users (
+                user_id INTEGER PRIMARY KEY,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+
+        # ==========================================
+        # CUSTOMER TRACKING TABLES
+        # ==========================================
+
+        # 1. Store customer tracking preferences
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS user_tracking_preferences (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL UNIQUE,
+                activity_tracking INTEGER NOT NULL DEFAULT 0,
+                approximate_location INTEGER NOT NULL DEFAULT 0,
+                precise_location INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+                    ON DELETE CASCADE
+            )
+        """)
+
+        # 2. Store customer activities
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS user_activity_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                activity_type TEXT NOT NULL,
+                description TEXT,
+                product_id INTEGER,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+                    ON DELETE CASCADE,
+                FOREIGN KEY (product_id) REFERENCES products(id)
+                    ON DELETE SET NULL
+            )
+        """)
+
+        # 3. Store customer location information
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS user_locations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                country TEXT,
+                region TEXT,
+                town TEXT,
+                latitude REAL,
+                longitude REAL,
+                accuracy REAL,
+                location_source TEXT NOT NULL,
+                recorded_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+                    ON DELETE CASCADE
+            )
+        """)
+
+        # ==========================================
+        # SELLER SUBSCRIPTION TABLES
+        # ==========================================
+
+        # Store seller subscription history
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS seller_subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                seller_id INTEGER NOT NULL,
+                plan TEXT NOT NULL
+                    CHECK(plan IN ('regular', 'pro', 'premium')),
+                price REAL NOT NULL,
+                product_limit INTEGER,
+                start_date TEXT NOT NULL,
+                end_date TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK(status IN ('pending', 'active', 'expired', 'cancelled')),
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (seller_id) REFERENCES users(id)
+                    ON DELETE CASCADE
+            )
+        """)
+
+        # Store subscription payment transactions
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS subscription_payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subscription_id INTEGER NOT NULL,
+                seller_id INTEGER NOT NULL,
+                reference TEXT NOT NULL UNIQUE,
+                amount_kobo INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'initialized',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (subscription_id)
+                    REFERENCES seller_subscriptions(id),
+                FOREIGN KEY (seller_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE
+            )
+        """)
+
+        connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_seller_subscriptions
+            ON seller_subscriptions(seller_id, status, end_date)
+        """)
 
         connection.commit()
 
     finally:
         connection.close()
-           
         
   
     
@@ -571,18 +794,18 @@ def safe_next_url(target):
 
     return target
 
-
 @app.route("/")
 def home():
-    # Get search and category values from the homepage
+    # Get search and category values
     search = request.args.get("q", "").strip()
     category = request.args.get("category", "").strip()
 
-    # Create the database connection BEFORE using it
     connection = get_db_connection()
 
     try:
-        # Main query: get products, seller names, and seller ratings
+        # Current time for checking active subscriptions
+        now = datetime.utcnow().isoformat()
+
         query = """
             SELECT
                 p.*,
@@ -598,19 +821,33 @@ def home():
                     SELECT COUNT(sr.id)
                     FROM seller_reviews AS sr
                     WHERE sr.seller_id = p.seller_id
-                ) AS seller_review_count
+                ) AS seller_review_count,
+
+                COALESCE(
+                    (
+                        SELECT ss.plan
+                        FROM seller_subscriptions AS ss
+                        WHERE ss.seller_id = p.seller_id
+                        AND ss.status = 'active'
+                        AND ss.end_date > ?
+                        ORDER BY ss.end_date DESC
+                        LIMIT 1
+                    ),
+                    'free'
+                ) AS seller_plan
 
             FROM products AS p
             JOIN users AS u ON u.id = p.seller_id
+
             WHERE u.role = 'seller'
             AND p.is_hidden = 0
             AND p.quantity > 0
-              
         """
 
-        parameters = []
+        # The first parameter belongs to the subscription subquery.
+        parameters = [now]
 
-        # Filter products by the search text
+        # Search products
         if search:
             query += """
                 AND (
@@ -624,20 +861,29 @@ def home():
             term = f"%{search}%"
             parameters.extend([term, term, term, term])
 
-        # Filter products by category
+        # Filter by category
         if category:
             query += " AND p.category = ?"
             parameters.append(category)
 
-        # Show the newest products first
-        query += " ORDER BY p.created_at DESC, p.id DESC"
+        # Subscription priority, then newest products first
+        query += """
+            ORDER BY
+                CASE seller_plan
+                    WHEN 'premium' THEN 1
+                    WHEN 'pro' THEN 2
+                    WHEN 'regular' THEN 3
+                    ELSE 4
+                END,
+                p.created_at DESC,
+                p.id DESC
+        """
 
-        # Run the product query
         products = connection.execute(
             query, parameters
         ).fetchall()
 
-        # Get categories for the category dropdown
+        # Get available categories
         categories = connection.execute("""
             SELECT DISTINCT category
             FROM products
@@ -647,10 +893,16 @@ def home():
         """).fetchall()
 
     finally:
-        # Always close the database connection
         connection.close()
 
-    # Send the results to the homepage
+    # Record customer searches when tracking is enabled
+    if search and session.get("user_id"):
+        log_user_activity(
+            session.get("user_id"),
+            "Product Search",
+            f"Searched for: {search[:200]}"
+        )
+
     return render_template(
         "index.html",
         products=products,
@@ -871,7 +1123,7 @@ def complete_registration():
                     "Your account has been created successfully.",
                     "success"
                 )
-
+                session["show_tracking_consent"] = True
                 return redirect(url_for("home"))
 
             except sqlite3.IntegrityError:
@@ -886,6 +1138,82 @@ def complete_registration():
         email=email,
         error=error
     )
+
+@app.route("/tracking-consent", methods=["GET", "POST"])
+def tracking_consent():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    user_id = session["user_id"]
+
+    if request.method == "POST":
+        activity_tracking = (
+            1 if request.form.get("activity_tracking") == "on" else 0
+        )
+
+        approximate_location = (
+            1 if request.form.get("approximate_location") == "on" else 0
+        )
+
+        precise_location = (
+            1 if request.form.get("precise_location") == "on" else 0
+        )
+
+        connection = get_db_connection()
+
+        try:
+            connection.execute("""
+                INSERT INTO user_tracking_preferences (
+                    user_id,
+                    activity_tracking,
+                    approximate_location,
+                    precise_location,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+
+                ON CONFLICT(user_id) DO UPDATE SET
+                    activity_tracking = excluded.activity_tracking,
+                    approximate_location = excluded.approximate_location,
+                    precise_location = excluded.precise_location,
+                    updated_at = excluded.updated_at
+            """, (
+                user_id,
+                activity_tracking,
+                approximate_location,
+                precise_location,
+                datetime.utcnow().isoformat()
+            ))
+
+            connection.commit()
+
+        finally:
+            connection.close()
+
+        # Save approximate location only when permitted
+        if approximate_location:
+            record_approximate_location(
+                user_id,
+                request.remote_addr
+            )
+
+        session.pop("show_tracking_consent", None)
+
+        # Respond to the homepage JavaScript
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({
+                "success": True,
+                "request_gps": bool(precise_location)
+            })
+
+        flash(
+            "Your tracking preferences have been saved.",
+            "success"
+        )
+
+        return redirect(url_for("home"))
+
+    return render_template("tracking_consent.html")
 
 @app.route("/account")
 def account():
@@ -1217,6 +1545,109 @@ def seller_dashboard():
         "seller_dashboard.html",
         stats=stats,
         products=products
+    )
+
+@app.route("/seller/account")
+def seller_account():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user_role") != "seller":
+        return redirect(url_for("home"))
+
+    seller_id = session["user_id"]
+    now = datetime.utcnow().isoformat()
+
+    connection = get_db_connection()
+
+    try:
+        # Get seller's personal and shop information
+        user = connection.execute("""
+            SELECT *
+            FROM users
+            WHERE id = ? AND role = 'seller'
+        """, (seller_id,)).fetchone()
+
+        if not user:
+            return redirect(url_for("home"))
+
+        # Mark expired subscriptions
+        connection.execute("""
+            UPDATE seller_subscriptions
+            SET status = 'expired'
+            WHERE seller_id = ?
+            AND status = 'active'
+            AND end_date <= ?
+        """, (seller_id, now))
+
+        # Get current active subscription
+        current_subscription = connection.execute("""
+            SELECT *
+            FROM seller_subscriptions
+            WHERE seller_id = ?
+            AND status = 'active'
+            AND end_date > ?
+            ORDER BY end_date DESC
+            LIMIT 1
+        """, (seller_id, now)).fetchone()
+
+        # Determine seller's current plan
+        if current_subscription:
+            plan_name = current_subscription["plan"].capitalize()
+            product_limit = current_subscription["product_limit"]
+            subscription_expiry = current_subscription["end_date"]
+        else:
+            plan_name = "Free"
+            product_limit = FREE_PRODUCT_LIMIT
+            subscription_expiry = None
+
+        # Count seller's products
+        product_count = connection.execute("""
+            SELECT COUNT(*) AS total
+            FROM products
+            WHERE seller_id = ?
+        """, (seller_id,)).fetchone()["total"]
+
+        # Get seller's order statistics
+        stats = connection.execute("""
+            SELECT
+                COUNT(o.id) AS total_orders,
+
+                COALESCE(SUM(
+                    CASE WHEN o.payment_status = 'Paid'
+                    THEN 1 ELSE 0 END
+                ), 0) AS paid_orders,
+
+                COALESCE(SUM(
+                    CASE WHEN o.payment_status IS NULL
+                         OR o.payment_status != 'Paid'
+                    THEN 1 ELSE 0 END
+                ), 0) AS unpaid_orders,
+
+                COALESCE(SUM(
+                    CASE WHEN o.payment_status = 'Paid'
+                    THEN o.total_price ELSE 0 END
+                ), 0) AS total_revenue
+
+            FROM orders o
+            JOIN products p ON p.id = o.product_id
+            WHERE p.seller_id = ?
+        """, (seller_id,)).fetchone()
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "seller_account.html",
+        user=user,
+        stats=stats,
+        product_count=product_count,
+        product_limit=product_limit,
+        plan_name=plan_name,
+        subscription_expiry=subscription_expiry,
+        current_subscription=current_subscription
     )
 @app.route("/seller-analytics")
 def seller_analytics():
@@ -1781,22 +2212,57 @@ def add_product():
         return redirect(url_for("home"))
 
     error = None
+    seller_id = session["user_id"]
 
+    def get_seller_product_limit(connection):
+        now = datetime.utcnow().isoformat()
+
+        # Expire subscriptions that have passed their expiry date.
+        connection.execute("""
+            UPDATE seller_subscriptions
+            SET status = 'expired'
+            WHERE seller_id = ?
+            AND status = 'active'
+            AND end_date <= ?
+        """, (seller_id, now))
+
+        subscription = connection.execute("""
+            SELECT product_limit
+            FROM seller_subscriptions
+            WHERE seller_id = ?
+            AND status = 'active'
+            AND end_date > ?
+            ORDER BY end_date DESC
+            LIMIT 1
+        """, (seller_id, now)).fetchone()
+
+        if subscription:
+            return subscription["product_limit"]
+
+        return FREE_PRODUCT_LIMIT
+
+    # Check the seller's current plan and product count.
     connection = get_db_connection()
     try:
+        product_limit = get_seller_product_limit(connection)
+
         count = connection.execute("""
             SELECT COUNT(*) AS total
             FROM products
             WHERE seller_id = ?
-        """, (session["user_id"],)).fetchone()["total"]
+        """, (seller_id,)).fetchone()["total"]
+
+        connection.commit()
     finally:
         connection.close()
 
-    if count >= FREE_PRODUCT_LIMIT:
-        return render_template(
-            "add_product.html",
-            error="You have reached your free limit of 5 products."
+    if product_limit is not None and count >= product_limit:
+        flash(
+            "You have reached your product listing limit. "
+            "Subscribe or upgrade your plan to continue.",
+            "warning"
         )
+        return redirect(url_for("subscription"))
 
     if request.method == "POST":
         name = request.form.get("name", "").strip()
@@ -1807,6 +2273,7 @@ def add_product():
 
         image_file = request.files.get("image")
         image_path = ""
+        unique_name = None
 
         try:
             price = float(price_text)
@@ -1830,7 +2297,6 @@ def add_product():
         except ValueError as exc:
             error = str(exc) or "Enter a valid price and quantity."
 
-        # Validate the image if the seller selected one.
         if not error and image_file and image_file.filename:
             original_name = secure_filename(image_file.filename)
 
@@ -1844,34 +2310,35 @@ def add_product():
                         "Image must be JPG, JPEG, PNG, WEBP or GIF."
                     )
                 else:
-                    unique_name = (
-                        uuid.uuid4().hex + "." + extension
-                    )
-
+                    unique_name = uuid.uuid4().hex + "." + extension
                     image_path = "/static/uploads/" + unique_name
 
         if not error:
             connection = get_db_connection()
+
             try:
-                # Recheck the limit before inserting.
+                # Recheck the active plan and limit before saving.
+                product_limit = get_seller_product_limit(connection)
+
                 current_count = connection.execute("""
                     SELECT COUNT(*) AS total
                     FROM products
                     WHERE seller_id = ?
-                """, (session["user_id"],)).fetchone()["total"]
+                """, (seller_id,)).fetchone()["total"]
 
-                if current_count >= FREE_PRODUCT_LIMIT:
+                if (
+                    product_limit is not None
+                    and current_count >= product_limit
+                ):
                     error = (
-                        "You have reached your free limit of 5 products."
+                        "You have reached your product listing limit. "
+                        "Please upgrade your subscription."
                     )
                 else:
-                    # Save the image only after validation.
                     if image_file and image_file.filename:
                         image_file.seek(0)
                         image_file.save(
-                            os.path.join(
-                                UPLOAD_FOLDER, unique_name
-                            )
+                            os.path.join(UPLOAD_FOLDER, unique_name)
                         )
 
                     connection.execute("""
@@ -1880,7 +2347,7 @@ def add_product():
                          quantity, image, description)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                     """, (
-                        session["user_id"],
+                        seller_id,
                         name,
                         category,
                         price,
@@ -1894,15 +2361,82 @@ def add_product():
             except Exception:
                 connection.rollback()
                 raise
+
             finally:
                 connection.close()
 
             if not error:
                 return redirect(url_for("seller_dashboard"))
 
+            # If the limit was reached, send the seller to subscriptions.
+            if "product listing limit" in error.lower():
+                flash(error, "warning")
+                return redirect(url_for("subscription"))
+
     return render_template(
         "add_product.html",
         error=error
+    )
+
+@app.route("/seller/subscription")
+def subscription():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user_role") != "seller":
+        return redirect(url_for("home"))
+
+    plans = {
+        "regular": {
+            "name": "Regular",
+            "price": 20,
+            "product_limit": 20
+        },
+        "pro": {
+            "name": "Pro",
+            "price": 38,
+            "product_limit": 50
+        },
+        "premium": {
+            "name": "Premium",
+            "price": 66,
+            "product_limit": None
+        }
+    }
+
+    now = datetime.utcnow().isoformat()
+
+    connection = get_db_connection()
+    try:
+        # Mark expired subscriptions.
+        connection.execute("""
+            UPDATE seller_subscriptions
+            SET status = 'expired'
+            WHERE seller_id = ?
+            AND status = 'active'
+            AND end_date <= ?
+        """, (session["user_id"], now))
+
+        connection.commit()
+
+        # Get the seller's current active subscription.
+        current_subscription = connection.execute("""
+            SELECT *
+            FROM seller_subscriptions
+            WHERE seller_id = ?
+            AND status = 'active'
+            AND end_date > ?
+            ORDER BY end_date DESC
+            LIMIT 1
+        """, (session["user_id"], now)).fetchone()
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "subscription.html",
+        plans=plans,
+        current_subscription=current_subscription
     )
 
 @app.route("/product/<int:product_id>")
@@ -1921,8 +2455,16 @@ def product_detail(product_id):
     if product is None:
         abort(404)
 
-    return render_template("product.html", product=product)
+    # Record product view if the customer has enabled tracking
+    if "user_id" in session:
+        log_user_activity(
+            session.get("user_id"),
+            "Product View",
+            f"Viewed product: {product['name']}",
+            product_id
+        )
 
+    return render_template("product.html", product=product)
 
 @app.route("/seller/<int:seller_id>")
 def seller_profile(seller_id):
@@ -2436,12 +2978,293 @@ def verify_payment():
     finally:
         connection.close()
 
-@app.route("/admin")
-@admin_required
-def admin_dashboard():
+# ==========================================
+# SELLER SUBSCRIPTION PAYMENTS
+# ==========================================
+
+@app.route("/seller/subscribe/<plan>", methods=["POST"])
+def initialize_subscription_payment(plan):
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user_role") != "seller":
+        return redirect(url_for("home"))
+
+    subscription_plans = {
+        "regular": {"price": 20, "product_limit": 20},
+        "pro": {"price": 38, "product_limit": 50},
+        "premium": {"price": 66, "product_limit": None}
+    }
+
+    selected_plan = subscription_plans.get(plan)
+
+    if not selected_plan:
+        abort(404)
+
+    if not PAYSTACK_SECRET_KEY:
+        return "Paystack secret key is missing.", 500
+
+    connection = get_db_connection()
+    reference = None
+    subscription_id = None
+
+    try:
+        seller = connection.execute("""
+            SELECT email
+            FROM users
+            WHERE id = ? AND role = 'seller'
+        """, (session["user_id"],)).fetchone()
+
+        if seller is None:
+            abort(404)
+
+        now = datetime.utcnow().isoformat()
+
+        # Create a pending subscription.
+        cursor = connection.execute("""
+            INSERT INTO seller_subscriptions (
+                seller_id, plan, price, product_limit,
+                start_date, end_date, status, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+        """, (
+            session["user_id"],
+            plan,
+            selected_plan["price"],
+            selected_plan["product_limit"],
+            now,
+            now,
+            now
+        ))
+
+        subscription_id = cursor.lastrowid
+
+        amount_kobo = selected_plan["price"] * 100
+        reference = "COS-SUB-" + uuid.uuid4().hex
+
+        connection.execute("""
+            INSERT INTO subscription_payments (
+                subscription_id, seller_id, reference,
+                amount_kobo, status, created_at
+            )
+            VALUES (?, ?, ?, ?, 'initialized', ?)
+        """, (
+            subscription_id,
+            session["user_id"],
+            reference,
+            amount_kobo,
+            now
+        ))
+
+        connection.commit()
+
+        # Initialize payment with Paystack.
+        payload = {
+            "email": seller["email"],
+            "amount": amount_kobo,
+            "currency": "GHS",
+            "reference": reference,
+            "callback_url": url_for(
+                "verify_subscription_payment",
+                _external=True
+            )
+        }
+
+        response = requests.post(
+            "https://api.paystack.co/transaction/initialize",
+            headers={
+                "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
+                "Content-Type": "application/json"
+            },
+            json=payload,
+            timeout=30
+        )
+
+        result = response.json()
+
+        if response.ok and result.get("status"):
+            return redirect(
+                result["data"]["authorization_url"]
+            )
+
+        connection.execute("""
+            UPDATE subscription_payments
+            SET status = 'failed'
+            WHERE reference = ?
+        """, (reference,))
+
+        connection.execute("""
+            UPDATE seller_subscriptions
+            SET status = 'cancelled'
+            WHERE id = ?
+        """, (subscription_id,))
+
+        connection.commit()
+
+        return "Could not initialize subscription payment.", 502
+
+    except requests.RequestException:
+        if reference:
+            connection.execute("""
+                UPDATE subscription_payments
+                SET status = 'failed'
+                WHERE reference = ?
+            """, (reference,))
+
+        if subscription_id:
+            connection.execute("""
+                UPDATE seller_subscriptions
+                SET status = 'cancelled'
+                WHERE id = ?
+            """, (subscription_id,))
+
+        connection.commit()
+
+        return "Could not connect to Paystack. Please try again.", 502
+
+    finally:
+        connection.close()
+
+
+# ==========================================
+# VERIFY SELLER SUBSCRIPTION PAYMENT
+# ==========================================
+
+@app.route("/subscription/payment/callback")
+def verify_subscription_payment():
+
+    reference = request.args.get("reference", "").strip()
+
+    if not reference:
+        return "Subscription payment reference is missing.", 400
+
+    if not PAYSTACK_SECRET_KEY:
+        return "Paystack secret key is missing.", 500
 
     connection = get_db_connection()
 
+    try:
+        payment = connection.execute("""
+            SELECT
+                sp.id AS payment_id,
+                sp.reference,
+                sp.amount_kobo,
+                sp.status AS payment_status,
+                ss.id AS subscription_id,
+                ss.seller_id
+            FROM subscription_payments sp
+            JOIN seller_subscriptions ss
+                ON ss.id = sp.subscription_id
+            WHERE sp.reference = ?
+        """, (reference,)).fetchone()
+
+        if payment is None:
+            abort(404)
+
+        if payment["payment_status"] == "success":
+            return render_template(
+                "payment_result.html",
+                success=True,
+                message="Your subscription payment has already been verified."
+            )
+
+        response = requests.get(
+            "https://api.paystack.co/transaction/verify/"
+            + requests.utils.quote(reference, safe=""),
+            headers={
+                "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}"
+            },
+            timeout=30
+        )
+
+        result = response.json()
+
+        if not response.ok or not result.get("status"):
+            return "Could not verify subscription payment.", 502
+
+        transaction = result.get("data", {})
+
+        valid_payment = (
+            transaction.get("status") == "success"
+            and transaction.get("reference") == reference
+            and transaction.get("amount") == payment["amount_kobo"]
+            and transaction.get("currency") == "GHS"
+        )
+
+        if valid_payment:
+
+            now = datetime.utcnow()
+            start_date = now.isoformat()
+            end_date = (now + timedelta(days=30)).isoformat()
+
+            # Replace any previous active subscription.
+            connection.execute("""
+                UPDATE seller_subscriptions
+                SET status = 'cancelled'
+                WHERE seller_id = ?
+                AND status = 'active'
+            """, (payment["seller_id"],))
+
+            # Activate the new subscription.
+            connection.execute("""
+                UPDATE seller_subscriptions
+                SET status = 'active',
+                    start_date = ?,
+                    end_date = ?
+                WHERE id = ?
+            """, (
+                start_date,
+                end_date,
+                payment["subscription_id"]
+            ))
+
+            connection.execute("""
+                UPDATE subscription_payments
+                SET status = 'success'
+                WHERE id = ?
+            """, (payment["payment_id"],))
+
+            connection.commit()
+
+            return render_template(
+                "payment_result.html",
+                success=True,
+                message="Your seller subscription is now active!"
+            )
+
+        if transaction.get("status") in ("failed", "abandoned"):
+            connection.execute("""
+                UPDATE subscription_payments
+                SET status = 'failed'
+                WHERE id = ?
+            """, (payment["payment_id"],))
+
+            connection.execute("""
+                UPDATE seller_subscriptions
+                SET status = 'cancelled'
+                WHERE id = ?
+            """, (payment["subscription_id"],))
+
+            connection.commit()
+
+        return render_template(
+            "payment_result.html",
+            success=False,
+            message="Your subscription payment has not been confirmed."
+        )
+
+    except requests.RequestException:
+        connection.rollback()
+        return "Could not contact Paystack to verify payment.", 502
+
+    finally:
+        connection.close()
+
+@app.route("/admin")
+@admin_required
+def admin_dashboard():
+    connection = get_db_connection()
     try:
         stats = connection.execute("""
             SELECT
@@ -2494,6 +3317,75 @@ def admin_dashboard():
         products=products,
         orders=orders
     ) 
+
+@app.route("/admin/tracking")
+@admin_required
+def admin_tracking():
+    connection = get_db_connection()
+
+    try:
+        customers = connection.execute("""
+            SELECT
+                u.id,
+                u.name,
+                u.email,
+                u.role,
+
+                COALESCE(tp.approximate_location, 0)
+                    AS approximate_location,
+
+                COALESCE(tp.precise_location, 0)
+                    AS precise_location,
+
+                loc.country,
+                loc.region,
+                loc.town,
+                loc.latitude,
+                loc.longitude,
+                loc.accuracy,
+                loc.location_source,
+                loc.recorded_at
+
+            FROM users u
+
+            LEFT JOIN user_tracking_preferences tp
+                ON tp.user_id = u.id
+
+            LEFT JOIN user_locations loc
+                ON loc.id = (
+                    SELECT l.id
+                    FROM user_locations l
+                    WHERE l.user_id = u.id
+
+                    AND (
+                        (
+                            l.location_source = 'IP'
+                            AND COALESCE(tp.approximate_location, 0) = 1
+                        )
+                        OR
+                        (
+                            l.location_source = 'GPS'
+                            AND COALESCE(tp.precise_location, 0) = 1
+                        )
+                    )
+
+                    ORDER BY l.recorded_at DESC, l.id DESC
+                    LIMIT 1
+                )
+
+            WHERE u.role = 'buyer'
+
+            ORDER BY u.id DESC
+        """).fetchall()
+
+    finally:
+        connection.close()
+
+    return render_template(
+        "admin_tracking.html",
+        customers=customers
+    )
+        
 @app.route("/admin/users")
 @admin_required
 def admin_users():
